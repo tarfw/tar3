@@ -298,14 +298,7 @@ export default function HomeScreen() {
         stickySectionHeadersEnabled={false}
       />
 
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary }]}
-        onPress={() => router.push('/create-issue')}
-        activeOpacity={0.8}
-      >
-        <IconSymbol size={24} name="plus" color="white" />
-      </TouchableOpacity>
+
 
       {/* Status Picker Modal */}
       <Modal
@@ -467,21 +460,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     marginTop: Spacing.xl,
   },
-  fab: {
-    position: 'absolute',
-    bottom: Spacing.xl,
-    right: Spacing.xl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

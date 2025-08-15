@@ -72,6 +72,19 @@ const MAPPING = {
   'xmark': 'close',
   'checkmark': 'check',
   'xmark.circle': 'cancel',
+  
+  // Missing icons causing warnings
+  'plus': 'add',
+  'plus.circle.fill': 'add-circle',
+  'bubble.left.fill': 'chat-bubble',
+  'trash': 'delete',
+  'hourglass': 'hourglass-empty',
+  'note.text': 'note',
+  'xmark.circle.fill': 'cancel',
+  'exclamationmark.triangle.fill': 'warning',
+  'arrow.up': 'keyboard-arrow-up',
+  'person': 'person',
+  'calendar': 'event',
 } as IconMapping;
 
 /**

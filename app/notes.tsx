@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  Text,
-  Alert,
-} from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useHybridDb, LocalNote } from '@/contexts/HybridDbContext';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { LocalNote, useHybridDb } from '@/contexts/HybridDbContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { formatDate } from '@/lib/hybridDataService';
+import { Stack, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    FlatList,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function NotesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,26 +35,15 @@ export default function NotesScreen() {
       note.content?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateNote = async () => {
-    console.log('Creating note...');
-    try {
-      const newNote = await hybridDb.createNote();
-      if (newNote) {
-        router.push(`/note/${newNote.id}`);
-      } else {
-        Alert.alert('Error', 'Failed to create note');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to create note');
-      console.error('Create note error:', error);
-    }
+  const handleCreateNote = () => {
+    // Navigate to new note editor without creating in database
+    router.push('/note/new');
   };
 
   const handleDeleteNote = async (noteId: string) => {
     try {
       await hybridDb.deleteNote(noteId);
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete note');
       console.error('Delete note error:', error);
     }
   };
@@ -63,18 +51,25 @@ export default function NotesScreen() {
   const handlePullSync = async () => {
     try {
       await hybridDb.syncWithTurso();
-      Alert.alert('Success', 'Notes synced from cloud');
     } catch (error) {
-      Alert.alert('Error', 'Failed to sync notes');
       console.error('Sync error:', error);
+    }
+  };
+
+  const handlePushSync = async () => {
+    try {
+      await hybridDb.syncWithTurso();
+    } catch (error) {
+      console.error('Push sync error:', error);
     }
   };
 
   const renderNote = ({ item }: { item: LocalNote }) => (
     <TouchableOpacity
-      style={[styles.noteItem, { backgroundColor: cardColor, borderColor }]}
+      style={[styles.noteItem, { backgroundColor }]}
       onPress={() => router.push(`/note/${item.id}`)}
       activeOpacity={0.7}
+      onLongPress={() => handleDeleteNote(item.id)} // Long press to delete
     >
       <View style={styles.noteContent}>
         <Text style={[styles.noteTitle, { color: textColor }]} numberOfLines={1}>
@@ -88,34 +83,16 @@ export default function NotesScreen() {
         </Text>
       </View>
       
-      {/* Delete button */}
+      {/* Delete button - visible on the right */}
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={(e) => {
           e.stopPropagation();
-          Alert.alert(
-            'Delete Note',
-            'Are you sure you want to delete this note?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => handleDeleteNote(item.id),
-              },
-            ]
-          );
+          handleDeleteNote(item.id);
         }}
       >
         <IconSymbol size={18} name="trash" color="#ef4444" />
       </TouchableOpacity>
-
-      {/* Sync status indicator */}
-      {!item.syncedToTurso && (
-        <View style={[styles.syncIndicator, { backgroundColor: '#f59e0b' }]}>
-          <IconSymbol size={12} name="hourglass" color="white" />
-        </View>
-      )}
     </TouchableOpacity>
   );
 
@@ -159,12 +136,26 @@ export default function NotesScreen() {
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
           headerRight: () => (
-            <TouchableOpacity
-              onPress={handlePullSync}
-              style={styles.headerButton}
-            >
-              <Text style={[styles.headerButtonText, { color: tintColor }]}>Pull</Text>
-            </TouchableOpacity>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity
+                onPress={handlePullSync}
+                style={styles.headerButton}
+              >
+                <Text style={[styles.headerButtonText, { color: tintColor }]}>Pull</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handlePushSync}
+                style={styles.headerButton}
+              >
+                <Text style={[styles.headerButtonText, { color: tintColor }]}>Push</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleCreateNote}
+                style={styles.headerButton}
+              >
+                <IconSymbol size={20} name="plus" color={tintColor} />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -183,14 +174,7 @@ export default function NotesScreen() {
           showsVerticalScrollIndicator={false}
         />
 
-        {/* Floating Action Button */}
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: tintColor }]}
-          onPress={handleCreateNote}
-          activeOpacity={0.8}
-        >
-          <IconSymbol size={24} name="plus" color="white" />
-        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );
@@ -222,7 +206,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   listContent: {
-    paddingBottom: 100, // Extra padding for FAB
+    paddingBottom: 20,
   },
   listContentEmpty: {
     flexGrow: 1,
@@ -231,11 +215,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    position: 'relative',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 12,
   },
   noteContent: {
     flex: 1,
@@ -254,20 +239,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     lineHeight: 20,
   },
-  deleteButton: {
-    padding: 8,
-    marginLeft: 12,
-  },
-  syncIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -285,23 +257,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 32,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+
+  headerButtons: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    gap: 12,
   },
   headerButton: {
     paddingHorizontal: 16,

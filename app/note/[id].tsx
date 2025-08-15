@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useHybridDb, LocalNote } from '@/contexts/HybridDbContext';
+import { useHybridDb } from '@/contexts/HybridDbContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function NoteScreen() {
   const { id } = useLocalSearchParams();
@@ -15,15 +15,23 @@ export default function NoteScreen() {
     content: '' 
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isNewNote, setIsNewNote] = useState(false);
   
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const placeholderColor = useThemeColor({}, 'tabIconDefault') || '#8E8E93';
 
-  // Load note data
+  // Load note data once on mount
   useEffect(() => {
-    const fetchNote = () => {
+    if (id === 'new') {
+      // New note - start with empty state
+      setIsNewNote(true);
+      setNote({ title: '', content: '' });
+      setIsLoading(false);
+    } else if (id) {
+      // Existing note - load from database
       try {
         const currentNote = hybridDb.getNoteById(id as string);
         if (currentNote) {
@@ -34,66 +42,69 @@ export default function NoteScreen() {
         }
       } catch (error) {
         console.error('Error fetching note:', error);
-        Alert.alert('Error', 'Failed to load note');
       } finally {
         setIsLoading(false);
       }
-    };
-
-    if (id) {
-      fetchNote();
     }
-  }, [id, hybridDb]);
+  }, [id]);
 
-  const handleTitleChange = async (title: string) => {
+  const handleTitleChange = (title: string) => {
+    // Update UI immediately for smooth typing
     setNote((prev) => ({ ...prev, title }));
-    try {
-      await hybridDb.updateNote(id as string, { title });
-    } catch (error) {
-      console.error('Error updating note title:', error);
+    if (!isNewNote) {
+      setHasUnsavedChanges(true);
     }
   };
 
-  const handleContentChange = async (content: string) => {
+  const handleContentChange = (content: string) => {
+    // Update UI immediately for smooth typing
     setNote((prev) => ({ ...prev, content }));
-    try {
-      await hybridDb.updateNote(id as string, { content });
-    } catch (error) {
-      console.error('Error updating note content:', error);
+    if (!isNewNote) {
+      setHasUnsavedChanges(true);
     }
   };
 
-  const handlePushSync = async () => {
+  const handleSave = async () => {
     try {
-      await hybridDb.syncWithTurso();
-      Alert.alert('Success', 'Note pushed to cloud');
+      if (isNewNote) {
+        // Create new note in database
+        const newNote = await hybridDb.createNote();
+        if (newNote) {
+          // Update the newly created note with our content
+          await hybridDb.updateNote(newNote.id, { 
+            title: note.title, 
+            content: note.content 
+          });
+          // Navigate to the actual note ID and update state
+          setIsNewNote(false);
+          router.replace(`/note/${newNote.id}`);
+        }
+      } else {
+        // Update existing note
+        await hybridDb.updateNote(id as string, { 
+          title: note.title, 
+          content: note.content 
+        });
+      }
+      setHasUnsavedChanges(false);
     } catch (error) {
-      Alert.alert('Error', 'Failed to sync note');
-      console.error('Sync error:', error);
+      console.error('Save error:', error);
     }
   };
 
   const handleDeleteNote = async () => {
-    Alert.alert(
-      'Delete Note',
-      'Are you sure you want to delete this note?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await hybridDb.deleteNote(id as string);
-              router.back();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete note');
-              console.error('Delete note error:', error);
-            }
-          },
-        },
-      ]
-    );
+    if (isNewNote) {
+      // For new notes, just go back without deleting anything
+      router.back();
+      return;
+    }
+    
+    try {
+      await hybridDb.deleteNote(id as string);
+      router.back();
+    } catch (error) {
+      console.error('Delete note error:', error);
+    }
   };
 
   if (isLoading) {
@@ -110,7 +121,7 @@ export default function NoteScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor }]}>
       <Stack.Screen
         options={{
-          headerTitle: note.title || 'Untitled',
+          headerTitle: isNewNote ? 'New Note' : 'Note',
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
           headerRight: () => (
@@ -119,13 +130,23 @@ export default function NoteScreen() {
                 onPress={handleDeleteNote}
                 style={[styles.headerButton, styles.deleteButton]}
               >
-                <Text style={styles.deleteButtonText}>Delete</Text>
+                <Text style={styles.deleteButtonText}>
+                  {isNewNote ? 'Cancel' : 'Delete'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handlePushSync}
-                style={styles.headerButton}
+                onPress={handleSave}
+                style={[
+                  styles.headerButton,
+                  (hasUnsavedChanges || isNewNote) && { backgroundColor: tintColor + '20' }
+                ]}
               >
-                <Text style={[styles.headerButtonText, { color: tintColor }]}>Push</Text>
+                <Text style={[
+                  styles.headerButtonText, 
+                  { color: (hasUnsavedChanges || isNewNote) ? tintColor : tintColor + '60' }
+                ]}>
+                  Save
+                </Text>
               </TouchableOpacity>
             </View>
           ),
