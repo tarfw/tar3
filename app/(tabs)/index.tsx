@@ -1,5 +1,4 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { StatusPicker } from '@/components/ui/StatusPicker';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Colors, getPriorityColor } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
@@ -242,7 +241,7 @@ export default function HomeScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View>
           <Text style={[TextStyles.h2, { color: colors.text }]}>
-            Issues
+            Tasks
           </Text>
         </View>
         <View style={styles.headerActions}>

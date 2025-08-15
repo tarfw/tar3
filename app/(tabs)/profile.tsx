@@ -1,7 +1,10 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { SyncSettings } from '@/components/ui/SyncSettings';
+import { HybridIssueDemo } from '@/components/ui/HybridIssueDemo';
 import { Colors } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useHybridDb } from '@/contexts/HybridDbContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { router } from 'expo-router';
 import React from 'react';
@@ -27,6 +30,7 @@ export default function CreateScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { themeMode, setThemeMode } = useTheme();
+  const hybridDb = useHybridDb();
 
   const createOptions: CreateOption[] = [
     {
@@ -35,6 +39,13 @@ export default function CreateScreen() {
       subtitle: 'Create a new issue or task',
       color: colors.primary,
       route: '/create-issue',
+    },
+    {
+      icon: 'note.text',
+      title: 'Note',
+      subtitle: 'Write a quick note',
+      color: '#10b981',
+      route: '/create-note',
     },
     {
       icon: 'person.3',
@@ -53,6 +64,12 @@ export default function CreateScreen() {
   ];
 
   const quickActions = [
+    {
+      icon: 'note.text',
+      title: 'Notes',
+      subtitle: 'Create and manage notes',
+      route: '/notes',
+    },
     {
       icon: 'plus.rectangle.on.folder',
       title: 'Import from CSV',
@@ -81,6 +98,19 @@ export default function CreateScreen() {
         { text: 'OK', style: 'default' }
       ]
     );
+  };
+
+  const handleCreateNote = async () => {
+    try {
+      const newNote = await hybridDb.createNote({
+        title: 'New Note',
+        content: ''
+      });
+      router.push(`/note/${newNote.id}`);
+    } catch (error) {
+      console.error('Error creating note:', error);
+      Alert.alert('Error', 'Failed to create note');
+    }
   };
 
   const handleThemeChange = () => {
@@ -112,7 +142,13 @@ export default function CreateScreen() {
     <TouchableOpacity
       key={index}
       style={[styles.createOption, { backgroundColor: colors.surface }]}
-      onPress={() => router.push(option.route as any)}
+      onPress={() => {
+        if (option.route === '/create-note') {
+          handleCreateNote();
+        } else {
+          router.push(option.route as any);
+        }
+      }}
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: `${option.color}20` }]}>
@@ -135,8 +171,12 @@ export default function CreateScreen() {
       key={index}
       style={[styles.quickAction, { backgroundColor: colors.surface }]}
       onPress={() => {
-        // For now, just show that it's not implemented
-        console.log(`Navigate to ${action.route}`);
+        if (action.route === '/notes') {
+          router.push('/notes');
+        } else {
+          // For other routes, show that it's not implemented
+          Alert.alert('Coming Soon', `${action.title} feature is not yet implemented.`);
+        }
       }}
       activeOpacity={0.7}
     >
@@ -187,6 +227,12 @@ export default function CreateScreen() {
             {quickActions.map(renderQuickAction)}
           </View>
         </View>
+
+        {/* Hybrid Database Demo */}
+        <HybridIssueDemo />
+
+        {/* Database Sync Settings */}
+        <SyncSettings />
 
         {/* Settings */}
         <View style={styles.section}>
