@@ -129,36 +129,37 @@ export default function NotesScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor }]}>
-      <Stack.Screen
-        options={{
-          headerTitle: 'Notes',
-          headerStyle: { backgroundColor },
-          headerTintColor: textColor,
-          headerRight: () => (
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                onPress={handlePullSync}
-                style={styles.headerButton}
-              >
-                <Text style={[styles.headerButtonText, { color: tintColor }]}>Pull</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handlePushSync}
-                style={styles.headerButton}
-              >
-                <Text style={[styles.headerButtonText, { color: tintColor }]}>Push</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleCreateNote}
-                style={styles.headerButton}
-              >
-                <IconSymbol size={20} name="plus" color={tintColor} />
-              </TouchableOpacity>
-            </View>
-          ),
-        }}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor, elevation: 0 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Custom Header */}
+      <View style={[styles.header, { borderBottomColor: borderColor }]}>
+        <View>
+          <Text style={[styles.headerTitle, { color: textColor }]}>
+            Notes
+          </Text>
+        </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            onPress={handlePullSync}
+            style={styles.headerButton}
+          >
+            <Text style={[styles.headerButtonText, { color: tintColor }]}>Pull</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handlePushSync}
+            style={styles.headerButton}
+          >
+            <Text style={[styles.headerButtonText, { color: tintColor }]}>Push</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleCreateNote}
+            style={styles.headerButton}
+          >
+            <IconSymbol size={20} name="plus" color={tintColor} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View style={styles.content}>
         <FlatList
@@ -183,13 +184,30 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    elevation: 0,
   },
   content: {
     flex: 1,
   },
-  headerContainer: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
+    borderBottomWidth: 0.5,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
   },
   searchContainer: {
     flexDirection: 'row',

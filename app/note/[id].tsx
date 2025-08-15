@@ -75,9 +75,8 @@ export default function NoteScreen() {
             title: note.title, 
             content: note.content 
           });
-          // Navigate to the actual note ID and update state
-          setIsNewNote(false);
-          router.replace(`/note/${newNote.id}`);
+          setHasUnsavedChanges(false);
+          router.back();
         }
       } else {
         // Update existing note
@@ -85,8 +84,9 @@ export default function NoteScreen() {
           title: note.title, 
           content: note.content 
         });
+        setHasUnsavedChanges(false);
+        router.back();
       }
-      setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Save error:', error);
     }
@@ -118,40 +118,41 @@ export default function NoteScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor }]}>
-      <Stack.Screen
-        options={{
-          headerTitle: isNewNote ? 'New Note' : 'Note',
-          headerStyle: { backgroundColor },
-          headerTintColor: textColor,
-          headerRight: () => (
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                onPress={handleDeleteNote}
-                style={[styles.headerButton, styles.deleteButton]}
-              >
-                <Text style={styles.deleteButtonText}>
-                  {isNewNote ? 'Cancel' : 'Delete'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSave}
-                style={[
-                  styles.headerButton,
-                  (hasUnsavedChanges || isNewNote) && { backgroundColor: tintColor + '20' }
-                ]}
-              >
-                <Text style={[
-                  styles.headerButtonText, 
-                  { color: (hasUnsavedChanges || isNewNote) ? tintColor : tintColor + '60' }
-                ]}>
-                  Save
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ),
-        }}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor, elevation: 0 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Custom Header */}
+      <View style={[styles.header, { borderBottomColor: placeholderColor + '40' }]}>
+        <View>
+          <Text style={[styles.headerTitle, { color: textColor }]}>
+            {isNewNote ? 'New Note' : 'Note'}
+          </Text>
+        </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            onPress={handleDeleteNote}
+            style={[styles.headerButton, styles.deleteButton]}
+          >
+            <Text style={styles.deleteButtonText}>
+              {isNewNote ? 'Cancel' : 'Delete'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSave}
+            style={[
+              styles.headerButton,
+              (hasUnsavedChanges || isNewNote) && { backgroundColor: tintColor + '20' }
+            ]}
+          >
+            <Text style={[
+              styles.headerButtonText, 
+              { color: (hasUnsavedChanges || isNewNote) ? tintColor : tintColor + '60' }
+            ]}>
+              Save
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View style={styles.content}>
         <TextInput
@@ -181,6 +182,7 @@ export default function NoteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    elevation: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -190,9 +192,23 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 18,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
   content: {
     flex: 1,
     padding: 16,
+    paddingTop: 8,
+    elevation: 0,
   },
   titleInput: {
     fontSize: 24,

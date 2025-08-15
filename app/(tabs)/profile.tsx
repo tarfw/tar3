@@ -1,10 +1,7 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { SyncSettings } from '@/components/ui/SyncSettings';
-import { HybridIssueDemo } from '@/components/ui/HybridIssueDemo';
 import { Colors } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useHybridDb } from '@/contexts/HybridDbContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { router } from 'expo-router';
 import React from 'react';
@@ -30,7 +27,6 @@ export default function CreateScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { themeMode, setThemeMode } = useTheme();
-  const hybridDb = useHybridDb();
 
   const createOptions: CreateOption[] = [
     {
@@ -71,46 +67,17 @@ export default function CreateScreen() {
       route: '/notes',
     },
     {
-      icon: 'plus.rectangle.on.folder',
-      title: 'Import from CSV',
-      subtitle: 'Import issues from a CSV file',
-      route: '/import-csv',
-    },
-    {
       icon: 'square.and.arrow.down',
       title: 'Templates',
       subtitle: 'Use a project template',
       route: '/templates',
     },
-    {
-      icon: 'doc.on.clipboard',
-      title: 'Duplicate Project',
-      subtitle: 'Copy an existing project',
-      route: '/duplicate-project',
-    },
   ];
 
-  const handleInitializeDemoData = () => {
-    Alert.alert(
-      'Initialize Demo Data',
-      'This feature is not yet implemented.',
-      [
-        { text: 'OK', style: 'default' }
-      ]
-    );
-  };
 
-  const handleCreateNote = async () => {
-    try {
-      const newNote = await hybridDb.createNote({
-        title: 'New Note',
-        content: ''
-      });
-      router.push(`/note/${newNote.id}`);
-    } catch (error) {
-      console.error('Error creating note:', error);
-      Alert.alert('Error', 'Failed to create note');
-    }
+
+  const handleCreateNote = () => {
+    router.push('/create-note');
   };
 
   const handleThemeChange = () => {
@@ -142,13 +109,7 @@ export default function CreateScreen() {
     <TouchableOpacity
       key={index}
       style={[styles.createOption, { backgroundColor: colors.surface }]}
-      onPress={() => {
-        if (option.route === '/create-note') {
-          handleCreateNote();
-        } else {
-          router.push(option.route as any);
-        }
-      }}
+      onPress={() => router.push(option.route as any)}
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: `${option.color}20` }]}>
@@ -196,8 +157,12 @@ export default function CreateScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background, elevation: 0 }]}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        style={{ elevation: 0 }}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={[TextStyles.h2, { color: colors.text }]}>
@@ -228,11 +193,7 @@ export default function CreateScreen() {
           </View>
         </View>
 
-        {/* Hybrid Database Demo */}
-        <HybridIssueDemo />
 
-        {/* Database Sync Settings */}
-        <SyncSettings />
 
         {/* Settings */}
         <View style={styles.section}>
@@ -258,23 +219,7 @@ export default function CreateScreen() {
               <IconSymbol size={16} name="chevron.right" color={colors.iconSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.settingItem, { backgroundColor: colors.surface }]}
-              onPress={handleInitializeDemoData}
-            >
-              <View style={[styles.settingIcon, { backgroundColor: colors.backgroundSecondary }]}>
-                <IconSymbol size={20} name="plus.rectangle.on.folder" color={colors.icon} />
-              </View>
-              <View style={styles.settingContent}>
-                <Text style={[TextStyles.body, { color: colors.text }]}>
-                  Initialize Demo Data
-                </Text>
-                <Text style={[TextStyles.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-                  Create sample projects and issues
-                </Text>
-              </View>
-              <IconSymbol size={16} name="chevron.right" color={colors.iconSecondary} />
-            </TouchableOpacity>
+
           </View>
         </View>
       </ScrollView>
@@ -285,6 +230,7 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    elevation: 0,
   },
   scrollContainer: {
     paddingTop: Spacing.lg,
@@ -292,7 +238,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.xs,
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
   },
   section: {
     marginBottom: Spacing.xl,
