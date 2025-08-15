@@ -12,11 +12,11 @@ import { DataService } from '../lib/dataService';
 import { Comment, Issue } from '../lib/instant';
 
 // Turso DB Configuration
-export const TURSO_DB_NAME = 'tar3-local-db.db';
+export const TURSO_DB_NAME = 'tar.db';
 
 export const tursoOptions = {
-  url: "libsql://tar4-thamizhtar.aws-ap-south-1.turso.io",
-  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTUyMTQxNzAsImlkIjoiZDFhMjI1NjMtNDE2ZS00MWY3LTliYjUtODEyYTExMTczM2IzIiwicmlkIjoiZDZlZTYyOTItYTljZC00YzRmLWFkOWQtNjRmODk5N2ZmNzY2In0.VDURa4kpILRizxBZSTkRZxNkGoOOyNiz3ZSMmk0xR2sIeewkPFCHGZePWfTX7jhV9nbPL0bWYKaxfnOGlDH3Dw",
+  url: "libsql://tar5-thamizhtar.aws-ap-south-1.turso.io",
+  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTUyODY0MjAsImlkIjoiMGE1ZmZjNWYtYmE2My00Y2EwLTgwYmEtZmUwNTJhNDUzYzdkIiwicmlkIjoiNjcwMzFlNjgtYjc0NS00ODRjLTkwMjMtZTdlZGYwMWMyZGZjIn0.8t0cG6L8QtXoGGzBkrbGM5Szur1d2tAY0aXVD6b14r9dxOeGZOszttP7QckxSsUjAALhGrjVX9xKfsTCEIXOCw",
 };
 
 // Local SQLite issue structure (for Turso local-first)
@@ -47,12 +47,9 @@ export interface LocalComment {
 }
 
 export interface LocalNote {
-  id: string;
+  id: number;
   title: string | null;
   content: string | null;
-  modifiedDate: string;
-  createdAt: string;
-  syncedToTurso: boolean;
 }
 
 interface HybridDbContextType {
@@ -78,8 +75,8 @@ interface HybridDbContextType {
   
   // Notes operations
   createNote: () => Promise<LocalNote | undefined>;
-  updateNote: (id: string, updates: Partial<LocalNote>) => Promise<void>;
-  deleteNote: (id: string) => Promise<void>;
+  updateNote: (id: number, updates: Partial<LocalNote>) => Promise<void>;
+  deleteNote: (id: number) => Promise<void>;
   
   // Sync operations
   syncWithTurso: () => Promise<void>;
@@ -93,7 +90,7 @@ interface HybridDbContextType {
   getIssueById: (id: string) => LocalIssue | undefined;
   getCommentsForIssue: (issueId: string) => LocalComment[];
   getAllNotes: () => LocalNote[];
-  getNoteById: (id: string) => LocalNote | undefined;
+  getNoteById: (id: number) => LocalNote | undefined;
 }
 
 const HybridDbContext = createContext<HybridDbContextType | null>(null);
@@ -151,7 +148,7 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       setLocalComments(comments);
 
       const notes = await sqliteDb.getAllAsync<LocalNote>(
-        'SELECT * FROM notes ORDER BY modifiedDate DESC'
+        'SELECT * FROM notes ORDER BY id DESC'
       );
       setLocalNotes(notes);
     } catch (error) {
@@ -419,49 +416,38 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
   const createNote = useCallback(async (): Promise<LocalNote | undefined> => {
     if (!sqliteDb) return;
     
-    const now = new Date().toISOString();
-    const id = Date.now().toString();
-    
     const newNote: LocalNote = {
-      id,
+      id: 0, // Will be auto-generated
       title: '',
       content: '',
-      modifiedDate: now,
-      createdAt: now,
-      syncedToTurso: false,
     };
     
     try {
-      await sqliteDb.runAsync(
-        'INSERT INTO notes (id, title, content, modifiedDate, createdAt, syncedToTurso) VALUES (?, ?, ?, ?, ?, ?)',
-        newNote.id,
+      const result = await sqliteDb.runAsync(
+        'INSERT INTO notes (title, content) VALUES (?, ?)',
         newNote.title,
-        newNote.content,
-        newNote.modifiedDate,
-        newNote.createdAt,
-        newNote.syncedToTurso ? 1 : 0
+        newNote.content
       );
       
       await fetchLocalData();
-      return newNote;
+      
+      // Return the created note with the actual ID
+      return {
+        ...newNote,
+        id: result.lastInsertRowId as number,
+      };
     } catch (error) {
       console.error('Error creating note:', error);
     }
   }, [sqliteDb, fetchLocalData]);
 
-  const updateNote = useCallback(async (id: string, updates: Partial<LocalNote>) => {
+  const updateNote = useCallback(async (id: number, updates: Partial<LocalNote>) => {
     if (!sqliteDb) return;
     
-    const now = new Date().toISOString();
-    const updatedData = { ...updates, modifiedDate: now, syncedToTurso: false };
-    
     try {
-      const fields = Object.keys(updatedData).filter(key => updatedData[key as keyof typeof updatedData] !== undefined);
+      const fields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined);
       const setClause = fields.map(field => `${field} = ?`).join(', ');
-      const values = fields.map(field => {
-        const value = updatedData[field as keyof typeof updatedData];
-        return field === 'syncedToTurso' ? (value ? 1 : 0) : value;
-      });
+      const values = fields.map(field => updates[field as keyof typeof updates]);
       
       await sqliteDb.runAsync(
         `UPDATE notes SET ${setClause} WHERE id = ?`,
@@ -475,7 +461,7 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     }
   }, [sqliteDb, fetchLocalData]);
 
-  const deleteNote = useCallback(async (id: string) => {
+  const deleteNote = useCallback(async (id: number) => {
     if (!sqliteDb) return;
     
     try {
@@ -491,7 +477,7 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     return localNotes;
   }, [localNotes]);
 
-  const getNoteById = useCallback((id: string) => {
+  const getNoteById = useCallback((id: number) => {
     return localNotes.find(note => note.id === id);
   }, [localNotes]);
 

@@ -1,7 +1,6 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { LocalNote, useHybridDb } from '@/contexts/HybridDbContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { formatDate } from '@/lib/hybridDataService';
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -40,7 +39,7 @@ export default function NotesScreen() {
     router.push('/note/new');
   };
 
-  const handleDeleteNote = async (noteId: string) => {
+  const handleDeleteNote = async (noteId: number) => {
     try {
       await hybridDb.deleteNote(noteId);
     } catch (error) {
@@ -76,7 +75,7 @@ export default function NotesScreen() {
           {item.title || 'Untitled Note'}
         </Text>
         <Text style={[styles.noteDate, { color: secondaryTextColor }]}>
-          {formatDate(item.modifiedDate)}
+          {item.id}
         </Text>
         <Text style={[styles.notePreview, { color: secondaryTextColor }]} numberOfLines={2}>
           {item.content || 'No additional text'}
@@ -165,7 +164,7 @@ export default function NotesScreen() {
         <FlatList
           data={filteredNotes}
           renderItem={renderNote}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={[

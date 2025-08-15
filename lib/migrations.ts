@@ -76,12 +76,9 @@ async function applyInitialMigration(db: SQLiteDatabase) {
   // Create notes table
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS notes (
-      id TEXT PRIMARY KEY NOT NULL,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT,
-      content TEXT,
-      modifiedDate TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      syncedToTurso BOOLEAN NOT NULL DEFAULT 0
+      content TEXT
     );
   `);
 
@@ -96,8 +93,6 @@ async function applyInitialMigration(db: SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issueId);
     CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(authorId);
     CREATE INDEX IF NOT EXISTS idx_comments_sync ON comments(syncedToInstant);
-    CREATE INDEX IF NOT EXISTS idx_notes_modified ON notes(modifiedDate);
-    CREATE INDEX IF NOT EXISTS idx_notes_sync ON notes(syncedToTurso);
   `);
 
   console.log('Initial migration applied successfully');

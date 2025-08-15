@@ -33,7 +33,8 @@ export default function NoteScreen() {
     } else if (id) {
       // Existing note - load from database
       try {
-        const currentNote = hybridDb.getNoteById(id as string);
+        const noteId = parseInt(id as string, 10);
+        const currentNote = hybridDb.getNoteById(noteId);
         if (currentNote) {
           setNote({
             title: currentNote.title || '',
@@ -80,7 +81,8 @@ export default function NoteScreen() {
         }
       } else {
         // Update existing note
-        await hybridDb.updateNote(id as string, { 
+        const noteId = parseInt(id as string, 10);
+        await hybridDb.updateNote(noteId, { 
           title: note.title, 
           content: note.content 
         });
@@ -100,7 +102,8 @@ export default function NoteScreen() {
     }
     
     try {
-      await hybridDb.deleteNote(id as string);
+      const noteId = parseInt(id as string, 10);
+      await hybridDb.deleteNote(noteId);
       router.back();
     } catch (error) {
       console.error('Delete note error:', error);
