@@ -56,7 +56,7 @@ export default function CreateIssueScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   
   // Use InstantDB's useLocalId for consistent user identification
-  const localUserId = db.useLocalId('current-user');
+  const localUserId = db.useLocalId();
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

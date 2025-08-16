@@ -1,6 +1,7 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { router } from 'expo-router';
@@ -23,10 +24,11 @@ interface CreateOption {
   route: string;
 }
 
-export default function CreateScreen() {
+export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { themeMode, setThemeMode } = useTheme();
+  const { user, signOut } = useAuth();
 
   const createOptions: CreateOption[] = [
     {
@@ -105,6 +107,21 @@ export default function CreateScreen() {
     );
   };
 
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          onPress: signOut,
+          style: 'destructive'
+        },
+      ]
+    );
+  };
+
   const renderCreateOption = (option: CreateOption, index: number) => (
     <TouchableOpacity
       key={index}
@@ -166,12 +183,33 @@ export default function CreateScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[TextStyles.h2, { color: colors.text }]}>
-            Create
+            Profile
           </Text>
           <Text style={[TextStyles.body, { color: colors.textSecondary, marginTop: 4 }]}>
-            Start something new
+            {user?.email || 'Manage your account'}
           </Text>
         </View>
+
+        {/* User Info */}
+        {user && (
+          <View style={styles.section}>
+            <View style={[styles.userCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.avatarContainer, { backgroundColor: colors.primary + '20' }]}>
+                <Text style={[TextStyles.h3, { color: colors.primary }]}>
+                  {user.email?.charAt(0).toUpperCase() || 'U'}
+                </Text>
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={[TextStyles.label, { color: colors.text }]}>
+                  {user.email}
+                </Text>
+                <Text style={[TextStyles.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                  Signed in with magic code
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Main Create Options */}
         <View style={styles.section}>
@@ -219,7 +257,23 @@ export default function CreateScreen() {
               <IconSymbol size={16} name="chevron.right" color={colors.iconSecondary} />
             </TouchableOpacity>
 
-
+            <TouchableOpacity
+              style={[styles.settingItem, { backgroundColor: colors.surface }]}
+              onPress={handleSignOut}
+            >
+              <View style={[styles.settingIcon, { backgroundColor: colors.error + '20' }]}>
+                <IconSymbol size={20} name="rectangle.portrait.and.arrow.right" color={colors.error} />
+              </View>
+              <View style={styles.settingContent}>
+                <Text style={[TextStyles.body, { color: colors.error }]}>
+                  Sign Out
+                </Text>
+                <Text style={[TextStyles.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                  Sign out of your account
+                </Text>
+              </View>
+              <IconSymbol size={16} name="chevron.right" color={colors.iconSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -311,6 +365,23 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   settingContent: {
+    flex: 1,
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+  },
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  userInfo: {
     flex: 1,
   },
 });

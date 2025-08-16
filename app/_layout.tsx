@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-get-random-values';
 import 'react-native-reanimated';
 
+import { AuthProvider } from '@/contexts/AuthContext';
 import { HybridDbProvider, TURSO_DB_NAME, tursoOptions } from '@/contexts/HybridDbContext';
 import { ThemeProvider, useColorScheme } from '@/contexts/ThemeContext';
 import { runMigrations } from '@/lib/migrations';
@@ -14,15 +15,19 @@ function AppContent() {
   const colorScheme = useColorScheme();
   
   return (
-    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="issue/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="create-issue" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </NavigationThemeProvider>
+    <AuthProvider>
+      <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="issue/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="create-issue" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </NavigationThemeProvider>
+    </AuthProvider>
   );
 }
 

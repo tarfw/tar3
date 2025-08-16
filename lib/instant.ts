@@ -1,82 +1,65 @@
-import { i, id, init, InstaQLEntity } from '@instantdb/react-native';
+import { id, init } from '@instantdb/react-native';
+import 'react-native-get-random-values'; // Required for crypto.randomUUID in React Native
 
-// Import required React Native dependencies
-import 'react-native-get-random-values';
+// You'll need to get your APP_ID from https://instantdb.com/dash
+const APP_ID = process.env.EXPO_PUBLIC_INSTANT_APP_ID || '__YOUR_APP_ID__';
 
-// App ID from your Instant DB dashboard
-const APP_ID = '9e8cde29-5ce0-4a73-91c3-0019a469001e';
+export const db = init({ appId: APP_ID });
 
-// Simplified schema with just two entities for best performance
-const schema = i.schema({
-  entities: {
-    // Issues (main entity)
-    issues: i.entity({
-      id: i.string(),
-      title: i.string(),
-      description: i.string().optional(),
-      identifier: i.string().indexed(), // e.g., 'ISS-123'
-      priority: i.number().indexed(), // 1-4 (1=urgent, 2=high, 3=medium, 4=low)
-      status: i.string().indexed(), // 'backlog', 'todo', 'in-progress', 'done'
-      statusColor: i.string(), // hex color for the status
-      assigneeId: i.string().optional().indexed(),
-      creatorId: i.string().indexed(),
-      createdAt: i.date().indexed(),
-      updatedAt: i.date().indexed(),
-      dueDate: i.date().optional().indexed(),
-    }),
-
-    // Comments
-    comments: i.entity({
-      id: i.string(),
-      body: i.string(),
-      issueId: i.string().indexed(),
-      authorId: i.string().indexed(),
-      createdAt: i.date().indexed(),
-      updatedAt: i.date().indexed(),
-    }),
-  },
-});
-
-// Type exports
-export type Issue = InstaQLEntity<typeof schema, 'issues'>;
-export type Comment = InstaQLEntity<typeof schema, 'comments'>;
-
-// Initialize the database
-export const db = init({ appId: APP_ID, schema });
-
-// Export InstantDB's ID generation function
+// Export InstantDB's built-in id function
 export { id };
 
-// Helper functions for common queries
-export const queries = {
-  // Get all issues
-  getAllIssues: () => ({
-    issues: {
-      $: {
-        order: { updatedAt: 'desc' },
-      },
-    },
-  }),
+// Types
+export interface Comment {
+  id: string;
+  content: string;
+  authorId: string;
+  issueId: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
-  // Get issue details with comments
+export interface Issue {
+  id: string;
+  title: string;
+  description: string;
+  status: 'open' | 'in-progress' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assigneeId?: string;
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Queries
+export const queries = {
   getIssueDetails: (issueId: string) => ({
     issues: {
-      $: { where: { id: issueId } },
+      $: {
+        where: {
+          id: issueId,
+        },
+      },
     },
     comments: {
       $: {
-        where: { issueId },
-        order: { createdAt: 'asc' },
+        where: {
+          issueId: issueId,
+        },
       },
     },
   }),
-
-  // Get user's assigned issues
+  
+  getAllIssues: () => ({
+    issues: {},
+  }),
+  
   getMyIssues: (userId: string) => ({
     issues: {
       $: {
-        where: { assigneeId: userId },
-        order: { updatedAt: 'desc' },
+        where: {
+          assigneeId: userId,
+        },
       },
     },
   }),

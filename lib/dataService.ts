@@ -34,7 +34,7 @@ export class DataService {
       dueDate: data.dueDate,
     };
 
-    await db.transact([db.tx.issues[issueId].update(issue)]);
+    await db.transact(db.tx.issues[issueId].update(issue));
     return issue;
   }
 
@@ -56,7 +56,7 @@ export class DataService {
       updatedAt: now,
     };
 
-    await db.transact([db.tx.comments[commentId].update(comment)]);
+    await db.transact(db.tx.comments[commentId].update(comment));
     return comment;
   }
 
@@ -64,37 +64,37 @@ export class DataService {
   static async updateIssueStatus(issueId: string, status: string, statusColor?: string) {
     const now = new Date().toISOString();
     
-    await db.transact([
+    await db.transact(
       db.tx.issues[issueId].update({
         status,
         statusColor: statusColor || '#94A3B8',
         updatedAt: now,
       })
-    ]);
+    );
   }
 
   // Update issue priority
   static async updateIssuePriority(issueId: string, priority: number) {
     const now = new Date().toISOString();
     
-    await db.transact([
+    await db.transact(
       db.tx.issues[issueId].update({
         priority,
         updatedAt: now,
       })
-    ]);
+    );
   }
 
   // Assign issue to user
   static async assignIssue(issueId: string, assigneeId: string | null) {
     const now = new Date().toISOString();
     
-    await db.transact([
+    await db.transact(
       db.tx.issues[issueId].update({
         assigneeId,
         updatedAt: now,
       })
-    ]);
+    );
   }
 }
 
