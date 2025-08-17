@@ -1,0 +1,84 @@
+# Item Management System — Detailed Database Plan for Vibe Code
+
+This document defines the database schema and relationships for the Item Management System. 
+Follow this as a reference when implementing in Vibe code. 
+All IDs are **auto-increment integers starting from 1**. 
+**No underscores** are used in table or column names (camelCase style).
+
+-------------------------------------------------
+TABLE: items
+-------------------------------------------------
+Stores the main product information.
+
+Columns:
+- id (INTEGER, PRIMARY KEY AUTOINCREMENT)
+- name (TEXT, NOT NULL)
+- category (TEXT, NULLABLE)
+- optionIds (TEXT, JSON array of opvalues.id)
+
+Relations:
+- One item can have many variants → variants.itemId
+- optionIds holds allowed opvalues.id
+
+-------------------------------------------------
+TABLE: opgroups
+-------------------------------------------------
+Defines the option groups (like Size, Color).
+
+Columns:
+- id (INTEGER, PRIMARY KEY AUTOINCREMENT)
+- name (TEXT, NOT NULL)
+
+Relations:
+- One opgroup can have many opvalues → opvalues.groupId
+
+-------------------------------------------------
+TABLE: opvalues
+-------------------------------------------------
+Defines the specific option values under each group.
+
+Columns:
+- id (INTEGER, PRIMARY KEY AUTOINCREMENT)
+- groupId (INTEGER, FOREIGN KEY → opgroups.id)
+- value (TEXT, NOT NULL)
+
+Relations:
+- Each opvalue belongs to exactly one opgroup
+
+-------------------------------------------------
+TABLE: variants
+-------------------------------------------------
+Represents the sellable units of each item, with price & stock.
+
+Columns:
+- id (INTEGER, PRIMARY KEY AUTOINCREMENT)
+- itemId (INTEGER, FOREIGN KEY → items.id)
+- sku (TEXT, NULLABLE)
+- barcode (TEXT, NULLABLE)
+- price (REAL, NOT NULL, DEFAULT 0)
+- stock (INTEGER, NOT NULL, DEFAULT 0)
+- status (INTEGER, DEFAULT 1) — (0 = Inactive, 1 = Active, 2 = Archived)
+- optionIds (TEXT, JSON array of opvalues.id)
+
+Relations:
+- Many variants belong to one item → itemId
+- optionIds defines the chosen opvalues for this variant
+
+-------------------------------------------------
+RELATION SUMMARY
+-------------------------------------------------
+items (id) ----< variants (itemId)
+opgroups (id) ----< opvalues (groupId)
+variants.optionIds → JSON array referencing opvalues.id
+items.optionIds → JSON array referencing opvalues.id
+
+-------------------------------------------------
+IMPLEMENTATION NOTES
+-------------------------------------------------
+1. Use camelCase naming convention everywhere.
+2. Do not manually set IDs; they are auto-incremented.
+3. Store optionIds as JSON arrays (example: "[1,2,3]").
+4. Variants must map to valid opvalues belonging to the item’s option groups.
+5. Status field in variants controls availability.
+6. Keep relations strict to ensure data integrity.
+

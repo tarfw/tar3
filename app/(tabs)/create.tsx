@@ -84,6 +84,12 @@ export default function CreateScreen() {
       subtitle: 'Use a project template',
       route: '/templates',
     },
+    {
+      icon: 'gearshape',
+      title: 'Settings',
+      subtitle: 'App preferences and account',
+      route: '/settings',
+    },
   ];
 
   const renderCreateOption = (option: CreateOption, index: number) => (
@@ -115,6 +121,8 @@ export default function CreateScreen() {
       onPress={() => {
         if (action.route === '/notes') {
           router.push('/notes');
+        } else if (action.route === '/settings') {
+          router.push('/settings');
         } else {
           Alert.alert('Coming Soon', `${action.title} feature is not yet implemented.`);
         }
