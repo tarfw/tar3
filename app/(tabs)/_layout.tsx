@@ -35,11 +35,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Workspace',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
-              name={focused ? "house.fill" : "house"} 
+              name={focused ? "app.fill" : "app"} 
               color={color} 
             />
           ),
@@ -48,11 +48,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Inbox',
+          title: 'People',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
-              name={focused ? "tray.fill" : "tray"} 
+              name="at" 
               color={color} 
             />
           ),
@@ -61,11 +61,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
+          title: 'Explore',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
-              name="magnifyingglass" 
+              name="globe" 
               color={color} 
             />
           ),
@@ -74,11 +74,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="my-issues"
         options={{
-          title: 'Projects',
+          title: 'Agents',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
-              name={focused ? "folder.fill" : "folder"} 
+              name="gamecontroller" 
               color={color} 
             />
           ),

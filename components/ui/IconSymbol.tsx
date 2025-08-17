@@ -85,6 +85,13 @@ const MAPPING = {
   'arrow.up': 'keyboard-arrow-up',
   'person': 'person',
   'calendar': 'event',
+  
+  // Tab bar icons
+  'app': 'crop-square',
+  'app.fill': 'crop-square',
+  'at': 'alternate-email',
+  'globe': 'public',
+  'gamecontroller': 'sports-esports',
 } as IconMapping;
 
 /**

@@ -2,157 +2,118 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { db, Issue, Comment } from '@/lib/instant';
-import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type ActivityItem = {
+type Person = {
   id: string;
-  type: 'issue_created' | 'issue_updated' | 'comment_added';
-  title: string;
-  message: string;
-  createdAt: string;
-  issueId?: string;
-  issue?: Issue;
+  name: string;
+  workProfile: string;
+  location: 'Home' | 'Work' | 'University';
+  avatar: string;
 };
 
 export default function InboxScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Query recent issues and comments for activity feed
-  const { isLoading, error, data } = db.useQuery({
-    issues: {
-      $: {
-        limit: 10,
-        order: { createdAt: 'desc' },
-      },
+  // Sample data of 6 people
+  const samplePeople: Person[] = [
+    {
+      id: '2',
+      name: 'Jackson Houston',
+      workProfile: 'Full Stack Developer',
+      location: 'Work',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face'
     },
-    comments: {
-      $: {
-        limit: 5,
-        order: { createdAt: 'desc' },
-      },
+    {
+      id: '3',
+      name: 'Lina Bradley',
+      workProfile: 'UX Researcher',
+      location: 'University',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face'
     },
-  });
+    {
+      id: '4',
+      name: 'Katie White',
+      workProfile: 'Marketing Manager',
+      location: 'Home',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=face'
+    },
+    {
+      id: '5',
+      name: 'Mae Walsh',
+      workProfile: 'Data Scientist',
+      location: 'Work',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+    },
+    {
+      id: '6',
+      name: 'Adeline McGuire',
+      workProfile: 'Software Engineer',
+      location: 'University',
+      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face'
+    }
+  ];
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    // Instant DB automatically handles refresh
-    setTimeout(() => setRefreshing(false), 1000);
+  const filteredPeople = samplePeople.filter(person =>
+    person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    person.workProfile.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handlePersonPress = (person: Person) => {
+    // Navigate to person profile or chat
+    console.log('Person pressed:', person.name);
   };
 
-  const handleActivityPress = (activity: ActivityItem) => {
-    // Navigate to issue if it exists
-    if (activity.issueId) {
-      router.push(`/issue/${activity.issueId}`);
+  const getLocationColor = (location: string) => {
+    switch (location) {
+      case 'Home':
+        return colors.success;
+      case 'Work':
+        return colors.primary;
+      case 'University':
+        return colors.warning;
+      default:
+        return colors.iconSecondary;
     }
   };
 
-  // Create activity feed from issues and comments
-  const createActivityFeed = (): ActivityItem[] => {
-    const activities: ActivityItem[] = [];
-    
-    // Add issues as activities
-    if (data?.issues) {
-      data.issues.forEach((issue) => {
-        activities.push({
-          id: `issue-${issue.id}`,
-          type: 'issue_created',
-          title: 'New issue created',
-          message: issue.title,
-          createdAt: issue.createdAt,
-          issueId: issue.id,
-          issue,
-        });
-      });
-    }
-
-    // Add comments as activities
-    if (data?.comments) {
-      data.comments.forEach((comment) => {
-        activities.push({
-          id: `comment-${comment.id}`,
-          type: 'comment_added',
-          title: 'New comment added',
-          message: comment.body.slice(0, 100) + (comment.body.length > 100 ? '...' : ''),
-          createdAt: comment.createdAt,
-          issueId: comment.issueId,
-        });
-      });
-    }
-
-    // Sort by creation date (newest first)
-    return activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  };
-
-  const renderActivityItem = ({ item: activity }: { item: ActivityItem }) => {
-    const getActivityIcon = (type: string) => {
-      switch (type) {
-        case 'issue_created':
-          return 'plus.circle.fill';
-        case 'comment_added':
-          return 'bubble.left.fill';
-        case 'issue_updated':
-          return 'pencil.circle.fill';
-        default:
-          return 'bell.fill';
-      }
-    };
-
-    const getActivityColor = (type: string) => {
-      switch (type) {
-        case 'issue_created':
-          return colors.primary;
-        case 'comment_added':
-          return colors.warning;
-        case 'issue_updated':
-          return colors.success;
-        default:
-          return colors.iconSecondary;
-      }
-    };
-
+  const renderPersonItem = ({ item: person }: { item: Person }) => {
     return (
       <TouchableOpacity
-        style={[styles.notificationItem, { backgroundColor: colors.surface }]}
-        onPress={() => handleActivityPress(activity)}
+        style={[styles.personCard, { backgroundColor: colors.surface }]}
+        onPress={() => handlePersonPress(person)}
         activeOpacity={0.7}
       >
-        <View style={styles.notificationContent}>
-          <View style={styles.notificationHeader}>
-            <View style={styles.iconContainer}>
-              <IconSymbol
-                size={20}
-                name={getActivityIcon(activity.type)}
-                color={getActivityColor(activity.type)}
-              />
-            </View>
-            <View style={styles.notificationText}>
-              <Text style={[TextStyles.label, { color: colors.text }]}>
-                {activity.title}
-              </Text>
-              <Text style={[TextStyles.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
-                {activity.message}
+        <View style={styles.personContent}>
+          <Image
+            source={{ uri: person.avatar }}
+            style={styles.avatar}
+          />
+          <View style={styles.personInfo}>
+            <View style={styles.locationContainer}>
+              <Text style={[styles.locationText, { color: getLocationColor(person.location) }]}>
+                {person.location}
               </Text>
             </View>
+            <Text style={[styles.personName, { color: colors.text }]}>
+              {person.name}
+            </Text>
+            <Text style={[styles.workProfile, { color: colors.textSecondary }]}>
+              {person.workProfile}
+            </Text>
           </View>
-          <Text style={[TextStyles.caption, { color: colors.textTertiary, marginTop: Spacing.sm }]}>
-            {new Date(activity.createdAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -160,55 +121,50 @@ export default function InboxScreen() {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <IconSymbol size={64} name="tray" color={colors.iconSecondary} />
+      <IconSymbol size={64} name="person.2" color={colors.iconSecondary} />
       <Text style={[TextStyles.h3, { color: colors.textSecondary, marginTop: Spacing.lg }]}>
-        No recent activity
+        No people found
       </Text>
       <Text style={[TextStyles.body, { color: colors.textTertiary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-        Create some issues or add comments to see activity here.
+        Try searching with different keywords.
       </Text>
     </View>
   );
 
-  if (error) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.errorContainer}>
-          <IconSymbol size={48} name="exclamationmark.triangle" color={colors.error} />
-          <Text style={[TextStyles.h3, { color: colors.text, marginTop: Spacing.lg }]}>
-            Something went wrong
-          </Text>
-          <Text style={[TextStyles.body, { color: colors.textSecondary, marginTop: Spacing.sm }]}>
-            {error.message}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const activities = createActivityFeed();
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[TextStyles.h2, { color: colors.text }]}>Activity</Text>
+      <View style={[styles.searchContainer, { borderBottomColor: colors.border }]}>
+        <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          <IconSymbol size={20} name="magnifyingglass" color={colors.iconSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search people..."
+            placeholderTextColor={colors.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              <IconSymbol size={16} name="xmark.circle.fill" color={colors.iconSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <FlatList
-        data={activities}
-        renderItem={renderActivityItem}
+        data={filteredPeople}
+        renderItem={renderPersonItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={renderEmpty}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
         showsVerticalScrollIndicator={false}
+        numColumns={1}
       />
     </SafeAreaView>
   );
@@ -218,52 +174,64 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  searchContainer: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 0.5,
   },
-  headerAction: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.lg,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+    ...TextStyles.body,
   },
   listContainer: {
     flexGrow: 1,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
-  notificationItem: {
-    marginHorizontal: Spacing.lg,
-    marginVertical: Spacing.xs,
-    borderRadius: Radius.lg,
+  personCard: {
+    borderRadius: Radius.xl,
     padding: Spacing.lg,
+    marginBottom: Spacing.md,
   },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationHeader: {
+  personContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  iconContainer: {
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginRight: Spacing.md,
-    paddingTop: 2,
   },
-  notificationText: {
+  personInfo: {
     flex: 1,
   },
-  actionButton: {
-    marginLeft: Spacing.sm,
-    padding: Spacing.xs,
+  locationContainer: {
+    marginBottom: Spacing.xs,
+  },
+  locationText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'lowercase',
+  },
+  personName: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  workProfile: {
+    fontSize: 14,
+    fontWeight: '400',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing['2xl'],
-  },
-  errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
