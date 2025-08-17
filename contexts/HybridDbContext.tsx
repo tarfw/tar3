@@ -15,8 +15,8 @@ import { Comment, Issue } from '../lib/instant';
 export const TURSO_DB_NAME = 'tar.db';
 
 export const tursoOptions = {
-  url: "libsql://tar5-thamizhtar.aws-ap-south-1.turso.io",
-  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTUyODY0MjAsImlkIjoiMGE1ZmZjNWYtYmE2My00Y2EwLTgwYmEtZmUwNTJhNDUzYzdkIiwicmlkIjoiNjcwMzFlNjgtYjc0NS00ODRjLTkwMjMtZTdlZGYwMWMyZGZjIn0.8t0cG6L8QtXoGGzBkrbGM5Szur1d2tAY0aXVD6b14r9dxOeGZOszttP7QckxSsUjAALhGrjVX9xKfsTCEIXOCw",
+  url: "libsql://tar6-thamizhtar.aws-ap-south-1.turso.io",
+  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTU0NzI2MTksImlkIjoiZTczMGE0MzUtNjVlNS00NjkyLThkZjAtN2VlOGI4NTE3ZTQxIiwicmlkIjoiNGEwZjEzOGQtODJlMC00OTNlLWE2YjAtMjZmN2FkOTg4YmQ1In0.X9G0THVRqmhyKiKlv9aL6404aWqOHt6fv0P5RuIz3Fl-7WY_HtSJ-sDwVylIKWtFtSm-1-6_Mf9As3nvMMHcAw",
 };
 
 // Local SQLite issue structure (for Turso local-first)
@@ -52,6 +52,36 @@ export interface LocalNote {
   content: string | null;
 }
 
+// Items interfaces (based on the schema)
+export interface LocalItem {
+  id: number;
+  name: string;
+  category: string | null;
+  optionIds: string; // JSON string of number array
+}
+
+export interface LocalVariant {
+  id: number;
+  itemId: number;
+  sku: string | null;
+  barcode: string | null;
+  price: number;
+  stock: number;
+  status: number; // 0 = Inactive, 1 = Active, 2 = Archived
+  optionIds: string; // JSON string of number array
+}
+
+export interface LocalOpGroup {
+  id: number;
+  name: string;
+}
+
+export interface LocalOpValue {
+  id: number;
+  groupId: number;
+  value: string;
+}
+
 interface HybridDbContextType {
   // Issues
   localIssues: LocalIssue[];
@@ -63,6 +93,12 @@ interface HybridDbContextType {
   
   // Notes
   localNotes: LocalNote[];
+  
+  // Items
+  localItems: LocalItem[];
+  localVariants: LocalVariant[];
+  localOpGroups: LocalOpGroup[];
+  localOpValues: LocalOpValue[];
   
   // Operations
   createIssue: (data: Omit<LocalIssue, 'id' | 'createdAt' | 'updatedAt' | 'syncedToInstant'>) => Promise<LocalIssue | undefined>;
@@ -78,6 +114,22 @@ interface HybridDbContextType {
   updateNote: (id: number, updates: Partial<LocalNote>) => Promise<void>;
   deleteNote: (id: number) => Promise<void>;
   
+  // Items operations
+  createItem: (item: Omit<LocalItem, 'id'>) => Promise<LocalItem | undefined>;
+  updateItem: (id: number, updates: Partial<LocalItem>) => Promise<void>;
+  deleteItem: (id: number) => Promise<void>;
+  
+  // Variants operations
+  createVariant: (variant: Omit<LocalVariant, 'id'>) => Promise<LocalVariant | undefined>;
+  updateVariant: (id: number, updates: Partial<LocalVariant>) => Promise<void>;
+  deleteVariant: (id: number) => Promise<void>;
+  
+  // Option Groups operations
+  createOpGroup: (group: Omit<LocalOpGroup, 'id'>) => Promise<LocalOpGroup | undefined>;
+  
+  // Option Values operations
+  createOpValue: (value: Omit<LocalOpValue, 'id'>) => Promise<LocalOpValue | undefined>;
+  
   // Sync operations
   syncWithTurso: () => Promise<void>;
   syncWithInstant: () => Promise<void>;
@@ -91,6 +143,14 @@ interface HybridDbContextType {
   getCommentsForIssue: (issueId: string) => LocalComment[];
   getAllNotes: () => LocalNote[];
   getNoteById: (id: number) => LocalNote | undefined;
+  
+  // Items data getters
+  getAllItems: () => LocalItem[];
+  getItem: (id: number) => LocalItem | undefined;
+  getVariantsByItemId: (itemId: number) => LocalVariant[];
+  getAllOpGroups: () => LocalOpGroup[];
+  getOpValuesByGroupId: (groupId: number) => LocalOpValue[];
+  getAllOpValues: () => LocalOpValue[];
 }
 
 const HybridDbContext = createContext<HybridDbContextType | null>(null);
@@ -108,13 +168,17 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
   const [localIssues, setLocalIssues] = useState<LocalIssue[]>([]);
   const [localComments, setLocalComments] = useState<LocalComment[]>([]);
   const [localNotes, setLocalNotes] = useState<LocalNote[]>([]);
+  const [localItems, setLocalItems] = useState<LocalItem[]>([]);
+  const [localVariants, setLocalVariants] = useState<LocalVariant[]>([]);
+  const [localOpGroups, setLocalOpGroups] = useState<LocalOpGroup[]>([]);
+  const [localOpValues, setLocalOpValues] = useState<LocalOpValue[]>([]);
   const [instantIssues, setInstantIssues] = useState<Issue[]>([]);
   const [instantComments, setInstantComments] = useState<Comment[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAutoSyncEnabled, setIsAutoSyncEnabled] = useState(false);
   
   // Sync interval ref
-  const syncIntervalRef = useRef<NodeJS.Timeout>();
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize and fetch data
   useEffect(() => {
@@ -151,6 +215,27 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         'SELECT * FROM notes ORDER BY id DESC'
       );
       setLocalNotes(notes);
+
+      // Fetch items data
+      const items = await sqliteDb.getAllAsync<LocalItem>(
+        'SELECT * FROM items ORDER BY id DESC'
+      );
+      setLocalItems(items);
+
+      const variants = await sqliteDb.getAllAsync<LocalVariant>(
+        'SELECT * FROM variants ORDER BY id DESC'
+      );
+      setLocalVariants(variants);
+
+      const opGroups = await sqliteDb.getAllAsync<LocalOpGroup>(
+        'SELECT * FROM opgroups ORDER BY id ASC'
+      );
+      setLocalOpGroups(opGroups);
+
+      const opValues = await sqliteDb.getAllAsync<LocalOpValue>(
+        'SELECT * FROM opvalues ORDER BY groupId ASC, id ASC'
+      );
+      setLocalOpValues(opValues);
     } catch (error) {
       console.error('Error fetching local data:', error);
     }
@@ -237,7 +322,7 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       syncIntervalRef.current = setInterval(() => {
         syncWithTurso();
         syncWithInstant();
-      }, 30000); // Sync every 30 seconds
+      }, 30000) as NodeJS.Timeout; // Sync every 30 seconds
     } else if (syncIntervalRef.current) {
       console.log('Stopping auto-sync...');
       clearInterval(syncIntervalRef.current);
@@ -481,12 +566,223 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     return localNotes.find(note => note.id === id);
   }, [localNotes]);
 
+  // Items operations
+  const createItem = useCallback(async (itemData: Omit<LocalItem, 'id'>): Promise<LocalItem | undefined> => {
+    if (!sqliteDb) return;
+    
+    try {
+      const result = await sqliteDb.runAsync(
+        'INSERT INTO items (name, category, optionIds) VALUES (?, ?, ?)',
+        itemData.name,
+        itemData.category,
+        itemData.optionIds
+      );
+      
+      await fetchLocalData();
+      
+      return {
+        ...itemData,
+        id: result.lastInsertRowId as number,
+      };
+    } catch (error) {
+      console.error('Error creating item:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  const updateItem = useCallback(async (id: number, updates: Partial<LocalItem>) => {
+    if (!sqliteDb) return;
+    
+    try {
+      const fields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined);
+      const setClause = fields.map(field => `${field} = ?`).join(', ');
+      const values = fields.map(field => updates[field as keyof typeof updates]);
+      
+      await sqliteDb.runAsync(
+        `UPDATE items SET ${setClause} WHERE id = ?`,
+        ...values,
+        id
+      );
+      
+      await fetchLocalData();
+    } catch (error) {
+      console.error('Error updating item:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  const deleteItem = useCallback(async (id: number) => {
+    if (!sqliteDb) return;
+    
+    try {
+      await sqliteDb.runAsync('DELETE FROM items WHERE id = ?', id);
+      await sqliteDb.runAsync('DELETE FROM variants WHERE itemId = ?', id);
+      await fetchLocalData();
+    } catch (error) {
+      console.error('Error deleting item:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  // Variants operations
+  const createVariant = useCallback(async (variantData: Omit<LocalVariant, 'id'>): Promise<LocalVariant | undefined> => {
+    if (!sqliteDb) return;
+    
+    try {
+      const result = await sqliteDb.runAsync(
+        'INSERT INTO variants (itemId, sku, barcode, price, stock, status, optionIds) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        variantData.itemId,
+        variantData.sku,
+        variantData.barcode,
+        variantData.price,
+        variantData.stock,
+        variantData.status,
+        variantData.optionIds
+      );
+      
+      await fetchLocalData();
+      
+      return {
+        ...variantData,
+        id: result.lastInsertRowId as number,
+      };
+    } catch (error) {
+      console.error('Error creating variant:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  const updateVariant = useCallback(async (id: number, updates: Partial<LocalVariant>) => {
+    if (!sqliteDb) return;
+    
+    try {
+      const fields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined);
+      const setClause = fields.map(field => `${field} = ?`).join(', ');
+      const values = fields.map(field => updates[field as keyof typeof updates]);
+      
+      await sqliteDb.runAsync(
+        `UPDATE variants SET ${setClause} WHERE id = ?`,
+        ...values,
+        id
+      );
+      
+      await fetchLocalData();
+    } catch (error) {
+      console.error('Error updating variant:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  const deleteVariant = useCallback(async (id: number) => {
+    if (!sqliteDb) return;
+    
+    try {
+      await sqliteDb.runAsync('DELETE FROM variants WHERE id = ?', id);
+      await fetchLocalData();
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  // Option Groups operations
+  const createOpGroup = useCallback(async (groupData: Omit<LocalOpGroup, 'id'>): Promise<LocalOpGroup | undefined> => {
+    if (!sqliteDb) return;
+    
+    try {
+      const result = await sqliteDb.runAsync(
+        'INSERT INTO opgroups (name) VALUES (?)',
+        groupData.name
+      );
+      
+      await fetchLocalData();
+      
+      return {
+        ...groupData,
+        id: result.lastInsertRowId as number,
+      };
+    } catch (error) {
+      console.error('Error creating option group:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  // Option Values operations
+  const createOpValue = useCallback(async (valueData: Omit<LocalOpValue, 'id'>): Promise<LocalOpValue | undefined> => {
+    if (!sqliteDb) return;
+    
+    try {
+      const result = await sqliteDb.runAsync(
+        'INSERT INTO opvalues (groupId, value) VALUES (?, ?)',
+        valueData.groupId,
+        valueData.value
+      );
+      
+      await fetchLocalData();
+      
+      return {
+        ...valueData,
+        id: result.lastInsertRowId as number,
+      };
+    } catch (error) {
+      console.error('Error creating option value:', error);
+    }
+  }, [sqliteDb, fetchLocalData]);
+
+  // Items data getters
+  const getAllItems = useCallback(() => {
+    // If no items in database, return some fallback data for testing
+    if (localItems.length === 0 && !sqliteDb) {
+      return [
+        {
+          id: 1,
+          name: 'Classic T-Shirt',
+          category: 'Apparel',
+          optionIds: '[1,2,7]'
+        },
+        {
+          id: 2,
+          name: 'Wireless Headphones',
+          category: 'Electronics',
+          optionIds: '[5,6]'
+        }
+      ];
+    }
+    return localItems;
+  }, [localItems, sqliteDb]);
+
+  const getItem = useCallback((id: number) => {
+    return localItems.find(item => item.id === id);
+  }, [localItems]);
+
+  const getVariantsByItemId = useCallback((itemId: number) => {
+    // If no variants in database, return some fallback data for testing
+    if (localVariants.length === 0 && !sqliteDb) {
+      const fallbackVariants = [
+        { id: 1, itemId: 1, sku: 'TSH-001-S-BLK', barcode: null, price: 29.99, stock: 50, status: 1, optionIds: '[1,4]' },
+        { id: 2, itemId: 1, sku: 'TSH-001-M-BLK', barcode: null, price: 29.99, stock: 30, status: 1, optionIds: '[2,4]' },
+        { id: 3, itemId: 2, sku: 'WH-002-BLK', barcode: null, price: 199.99, stock: 15, status: 1, optionIds: '[5]' }
+      ];
+      return fallbackVariants.filter(variant => variant.itemId === itemId);
+    }
+    return localVariants.filter(variant => variant.itemId === itemId);
+  }, [localVariants, sqliteDb]);
+
+  const getAllOpGroups = useCallback(() => {
+    return localOpGroups;
+  }, [localOpGroups]);
+
+  const getOpValuesByGroupId = useCallback((groupId: number) => {
+    return localOpValues.filter(value => value.groupId === groupId);
+  }, [localOpValues]);
+
+  const getAllOpValues = useCallback(() => {
+    return localOpValues;
+  }, [localOpValues]);
+
   const contextValue: HybridDbContextType = {
     localIssues,
     instantIssues,
     localComments,
     instantComments,
     localNotes,
+    localItems,
+    localVariants,
+    localOpGroups,
+    localOpValues,
     createIssue,
     updateIssue,
     deleteIssue,
@@ -496,6 +792,14 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     createNote,
     updateNote,
     deleteNote,
+    createItem,
+    updateItem,
+    deleteItem,
+    createVariant,
+    updateVariant,
+    deleteVariant,
+    createOpGroup,
+    createOpValue,
     syncWithTurso,
     syncWithInstant,
     toggleAutoSync,
@@ -506,6 +810,12 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     getCommentsForIssue,
     getAllNotes,
     getNoteById,
+    getAllItems,
+    getItem,
+    getVariantsByItemId,
+    getAllOpGroups,
+    getOpValuesByGroupId,
+    getAllOpValues,
   };
 
   return (

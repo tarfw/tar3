@@ -23,6 +23,8 @@ function AppContent() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="issue/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="create-issue" options={{ headerShown: false }} />
+          <Stack.Screen name="items" options={{ headerShown: false }} />
+          <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -43,8 +45,8 @@ export default function RootLayout() {
 
   // Check if Turso is configured
   const isTursoConfigured = Boolean(
-    "libsql://tar5-thamizhtar.aws-ap-south-1.turso.io" && 
-    "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTUyODY0MjAsImlkIjoiMGE1ZmZjNWYtYmE2My00Y2EwLTgwYmEtZmUwNTJhNDUzYzdkIiwicmlkIjoiNjcwMzFlNjgtYjc0NS00ODRjLTkwMjMtZTdlZGYwMWMyZGZjIn0.8t0cG6L8QtXoGGzBkrbGM5Szur1d2tAY0aXVD6b14r9dxOeGZOszttP7QckxSsUjAALhGrjVX9xKfsTCEIXOCw"
+    "libsql://tar6-thamizhtar.aws-ap-south-1.turso.io" && 
+    "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTU0NzI2MTksImlkIjoiZTczMGE0MzUtNjVlNS00NjkyLThkZjAtN2VlOGI4NTE3ZTQxIiwicmlkIjoiNGEwZjEzOGQtODJlMC00OTNlLWE2YjAtMjZmN2FkOTg4YmQ1In0.X9G0THVRqmhyKiKlv9aL6404aWqOHt6fv0P5RuIz3Fl-7WY_HtSJ-sDwVylIKWtFtSm-1-6_Mf9As3nvMMHcAw"
   );
 
   return (

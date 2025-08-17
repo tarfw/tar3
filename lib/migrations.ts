@@ -1,18 +1,28 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 
-export const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 2;
 
 export async function runMigrations(db: SQLiteDatabase) {
-  try {
-    // Always sync libSQL first to prevent conflicts between local and remote databases
-    await db.syncLibSQL();
-  } catch (e) {
-    console.log('Error syncing libSQL during migration:', e);
-  }
-
-  // Get current database version
+  // Get current database version first
   let result = await db.getFirstAsync<{ user_version: number } | null>('PRAGMA user_version');
   let currentDbVersion = result?.user_version ?? 0;
+
+  // Apply migrations first, then sync
+  if (currentDbVersion < DATABASE_VERSION) {
+    console.log('Applying migrations before sync...');
+    await applyMigrations(db, currentDbVersion);
+  }
+
+  // Now try to sync with remote
+  try {
+    await db.syncLibSQL();
+    console.log('Successfully synced with Turso after migration');
+  } catch (e) {
+    console.log('Error syncing libSQL after migration:', e);
+  }
+}
+
+async function applyMigrations(db: SQLiteDatabase, currentDbVersion: number) {
 
   // If the current version is already equal or newer, no migration is needed
   if (currentDbVersion >= DATABASE_VERSION) {
@@ -27,10 +37,10 @@ export async function runMigrations(db: SQLiteDatabase) {
   }
 
   // Future migrations can be added here
-  // if (currentDbVersion === 1) {
-  //   await applyMigrationV2(db);
-  //   currentDbVersion = 2;
-  // }
+  if (currentDbVersion === 1) {
+    await applyItemsMigration(db);
+    currentDbVersion = 2;
+  }
 
   // Set the database version after migrations
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
@@ -96,4 +106,95 @@ async function applyInitialMigration(db: SQLiteDatabase) {
   `);
 
   console.log('Initial migration applied successfully');
+}
+
+async function applyItemsMigration(db: SQLiteDatabase) {
+  console.log('Applying items migration...');
+  
+  // Create items table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT,
+      optionIds TEXT NOT NULL DEFAULT '[]'
+    );
+  `);
+
+  // Create variants table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      itemId INTEGER NOT NULL,
+      sku TEXT,
+      barcode TEXT,
+      price REAL NOT NULL DEFAULT 0,
+      stock INTEGER NOT NULL DEFAULT 0,
+      status INTEGER NOT NULL DEFAULT 1,
+      optionIds TEXT NOT NULL DEFAULT '[]',
+      FOREIGN KEY (itemId) REFERENCES items (id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create opgroups table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS opgroups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL
+    );
+  `);
+
+  // Create opvalues table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS opvalues (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      groupId INTEGER NOT NULL,
+      value TEXT NOT NULL,
+      FOREIGN KEY (groupId) REFERENCES opgroups (id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create indexes for better performance
+  await db.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_variants_item ON variants(itemId);
+    CREATE INDEX IF NOT EXISTS idx_variants_status ON variants(status);
+    CREATE INDEX IF NOT EXISTS idx_opvalues_group ON opvalues(groupId);
+  `);
+
+  // Insert default option groups and values
+  await db.execAsync(`
+    INSERT OR IGNORE INTO opgroups (id, name) VALUES 
+    (1, 'Size'),
+    (2, 'Color'),
+    (3, 'Material');
+  `);
+
+  await db.execAsync(`
+    INSERT OR IGNORE INTO opvalues (id, groupId, value) VALUES 
+    (1, 1, 'Small'),
+    (2, 1, 'Medium'),
+    (3, 1, 'Large'),
+    (4, 2, 'Black'),
+    (5, 2, 'White'),
+    (6, 2, 'Red'),
+    (7, 3, 'Cotton'),
+    (8, 3, 'Polyester');
+  `);
+
+  // Insert sample items
+  await db.execAsync(`
+    INSERT OR IGNORE INTO items (id, name, category, optionIds) VALUES 
+    (1, 'Classic T-Shirt', 'Apparel', '[1,2,7]'),
+    (2, 'Wireless Headphones', 'Electronics', '[5,6]');
+  `);
+
+  // Insert sample variants
+  await db.execAsync(`
+    INSERT OR IGNORE INTO variants (id, itemId, sku, price, stock, status, optionIds) VALUES 
+    (1, 1, 'TSH-001-S-BLK', 29.99, 50, 1, '[1,4]'),
+    (2, 1, 'TSH-001-M-BLK', 29.99, 30, 1, '[2,4]'),
+    (3, 2, 'WH-002-BLK', 199.99, 15, 1, '[5]');
+  `);
+
+  console.log('Items migration applied successfully');
 }

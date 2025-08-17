@@ -39,7 +39,7 @@ export default function CreateScreen() {
       title: 'Items',
       subtitle: 'Add new items',
       color: '#10b981',
-      route: '/create-items',
+      route: '/items',
     },
     {
       icon: 'doc.text',
