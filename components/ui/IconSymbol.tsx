@@ -92,6 +92,13 @@ const MAPPING = {
   'at': 'alternate-email',
   'globe': 'public',
   'gamecontroller': 'sports-esports',
+  
+  // Additional requested mappings
+  'list.bullet': 'format-list-bulleted',
+  'gearshape': 'settings',
+  'cart': 'shopping-cart',
+  'cube.box': 'inventory',
+  'square.grid.3x3': 'grid-view',
 } as IconMapping;
 
 /**

@@ -241,6 +241,35 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     }
   }, [sqliteDb]);
 
+  // Fetch only items-related data for better performance
+  const fetchItemsData = useCallback(async () => {
+    if (!sqliteDb) return;
+    
+    try {
+      const items = await sqliteDb.getAllAsync<LocalItem>(
+        'SELECT * FROM items ORDER BY id DESC'
+      );
+      setLocalItems(items);
+
+      const variants = await sqliteDb.getAllAsync<LocalVariant>(
+        'SELECT * FROM variants ORDER BY id DESC'
+      );
+      setLocalVariants(variants);
+
+      const opGroups = await sqliteDb.getAllAsync<LocalOpGroup>(
+        'SELECT * FROM opgroups ORDER BY id ASC'
+      );
+      setLocalOpGroups(opGroups);
+
+      const opValues = await sqliteDb.getAllAsync<LocalOpValue>(
+        'SELECT * FROM opvalues ORDER BY groupId ASC, id ASC'
+      );
+      setLocalOpValues(opValues);
+    } catch (error) {
+      console.error('Error fetching items data:', error);
+    }
+  }, [sqliteDb]);
+
   // Sync with Turso cloud
   const syncWithTurso = useCallback(async () => {
     if (!sqliteDb) return;
@@ -578,16 +607,19 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         itemData.optionIds
       );
       
-      await fetchLocalData();
-      
-      return {
+      const newItem: LocalItem = {
         ...itemData,
         id: result.lastInsertRowId as number,
       };
+      
+      // Update only the items state instead of fetching all data
+      setLocalItems(prev => [newItem, ...prev]);
+      
+      return newItem;
     } catch (error) {
       console.error('Error creating item:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   const updateItem = useCallback(async (id: number, updates: Partial<LocalItem>) => {
     if (!sqliteDb) return;
@@ -603,11 +635,14 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         id
       );
       
-      await fetchLocalData();
+      // Update only the items state instead of fetching all data
+      setLocalItems(prev => prev.map(item => 
+        item.id === id ? { ...item, ...updates } : item
+      ));
     } catch (error) {
       console.error('Error updating item:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   const deleteItem = useCallback(async (id: number) => {
     if (!sqliteDb) return;
@@ -615,11 +650,14 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     try {
       await sqliteDb.runAsync('DELETE FROM items WHERE id = ?', id);
       await sqliteDb.runAsync('DELETE FROM variants WHERE itemId = ?', id);
-      await fetchLocalData();
+      
+      // Update both items and variants state instead of fetching all data
+      setLocalItems(prev => prev.filter(item => item.id !== id));
+      setLocalVariants(prev => prev.filter(variant => variant.itemId !== id));
     } catch (error) {
       console.error('Error deleting item:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   // Variants operations
   const createVariant = useCallback(async (variantData: Omit<LocalVariant, 'id'>): Promise<LocalVariant | undefined> => {
@@ -637,16 +675,19 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         variantData.optionIds
       );
       
-      await fetchLocalData();
-      
-      return {
+      const newVariant: LocalVariant = {
         ...variantData,
         id: result.lastInsertRowId as number,
       };
+      
+      // Update only the variants state instead of fetching all data
+      setLocalVariants(prev => [newVariant, ...prev]);
+      
+      return newVariant;
     } catch (error) {
       console.error('Error creating variant:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   const updateVariant = useCallback(async (id: number, updates: Partial<LocalVariant>) => {
     if (!sqliteDb) return;
@@ -662,22 +703,27 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         id
       );
       
-      await fetchLocalData();
+      // Update only the variants state instead of fetching all data
+      setLocalVariants(prev => prev.map(variant => 
+        variant.id === id ? { ...variant, ...updates } : variant
+      ));
     } catch (error) {
       console.error('Error updating variant:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   const deleteVariant = useCallback(async (id: number) => {
     if (!sqliteDb) return;
     
     try {
       await sqliteDb.runAsync('DELETE FROM variants WHERE id = ?', id);
-      await fetchLocalData();
+      
+      // Update only the variants state instead of fetching all data
+      setLocalVariants(prev => prev.filter(variant => variant.id !== id));
     } catch (error) {
       console.error('Error deleting variant:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   // Option Groups operations
   const createOpGroup = useCallback(async (groupData: Omit<LocalOpGroup, 'id'>): Promise<LocalOpGroup | undefined> => {
@@ -689,16 +735,19 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         groupData.name
       );
       
-      await fetchLocalData();
-      
-      return {
+      const newGroup: LocalOpGroup = {
         ...groupData,
         id: result.lastInsertRowId as number,
       };
+      
+      // Update only the opgroups state instead of fetching all data
+      setLocalOpGroups(prev => [...prev, newGroup]);
+      
+      return newGroup;
     } catch (error) {
       console.error('Error creating option group:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   // Option Values operations
   const createOpValue = useCallback(async (valueData: Omit<LocalOpValue, 'id'>): Promise<LocalOpValue | undefined> => {
@@ -711,16 +760,19 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         valueData.value
       );
       
-      await fetchLocalData();
-      
-      return {
+      const newValue: LocalOpValue = {
         ...valueData,
         id: result.lastInsertRowId as number,
       };
+      
+      // Update only the opvalues state instead of fetching all data
+      setLocalOpValues(prev => [...prev, newValue]);
+      
+      return newValue;
     } catch (error) {
       console.error('Error creating option value:', error);
     }
-  }, [sqliteDb, fetchLocalData]);
+  }, [sqliteDb]);
 
   // Items data getters
   const getAllItems = useCallback(() => {

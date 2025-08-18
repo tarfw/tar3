@@ -53,7 +53,7 @@ export default function CreateScreen() {
       title: 'Note',
       subtitle: 'Write a quick note',
       color: '#10b981',
-      route: '/create-note',
+      route: '/notes',
     },
     {
       icon: 'person.3',
