@@ -69,6 +69,13 @@ export default function CreateScreen() {
       color: colors.error,
       route: '/create-label',
     },
+    {
+      icon: 'square.grid.3x3',
+      title: 'Groups',
+      subtitle: 'Manage option groups',
+      color: '#8b5cf6',
+      route: '/groups',
+    },
   ];
 
   const quickActions = [

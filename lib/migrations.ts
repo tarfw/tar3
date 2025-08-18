@@ -161,40 +161,7 @@ async function applyItemsMigration(db: SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS idx_opvalues_group ON opvalues(groupId);
   `);
 
-  // Insert default option groups and values
-  await db.execAsync(`
-    INSERT OR IGNORE INTO opgroups (id, name) VALUES 
-    (1, 'Size'),
-    (2, 'Color'),
-    (3, 'Material');
-  `);
-
-  await db.execAsync(`
-    INSERT OR IGNORE INTO opvalues (id, groupId, value) VALUES 
-    (1, 1, 'Small'),
-    (2, 1, 'Medium'),
-    (3, 1, 'Large'),
-    (4, 2, 'Black'),
-    (5, 2, 'White'),
-    (6, 2, 'Red'),
-    (7, 3, 'Cotton'),
-    (8, 3, 'Polyester');
-  `);
-
-  // Insert sample items
-  await db.execAsync(`
-    INSERT OR IGNORE INTO items (id, name, category, optionIds) VALUES 
-    (1, 'Classic T-Shirt', 'Apparel', '[1,2,7]'),
-    (2, 'Wireless Headphones', 'Electronics', '[5,6]');
-  `);
-
-  // Insert sample variants
-  await db.execAsync(`
-    INSERT OR IGNORE INTO variants (id, itemId, sku, price, stock, status, optionIds) VALUES 
-    (1, 1, 'TSH-001-S-BLK', 29.99, 50, 1, '[1,4]'),
-    (2, 1, 'TSH-001-M-BLK', 29.99, 30, 1, '[2,4]'),
-    (3, 2, 'WH-002-BLK', 199.99, 15, 1, '[5]');
-  `);
+  // Tables created successfully - no sample data inserted
 
   console.log('Items migration applied successfully');
 }

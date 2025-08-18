@@ -724,42 +724,16 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
 
   // Items data getters
   const getAllItems = useCallback(() => {
-    // If no items in database, return some fallback data for testing
-    if (localItems.length === 0 && !sqliteDb) {
-      return [
-        {
-          id: 1,
-          name: 'Classic T-Shirt',
-          category: 'Apparel',
-          optionIds: '[1,2,7]'
-        },
-        {
-          id: 2,
-          name: 'Wireless Headphones',
-          category: 'Electronics',
-          optionIds: '[5,6]'
-        }
-      ];
-    }
     return localItems;
-  }, [localItems, sqliteDb]);
+  }, [localItems]);
 
   const getItem = useCallback((id: number) => {
     return localItems.find(item => item.id === id);
   }, [localItems]);
 
   const getVariantsByItemId = useCallback((itemId: number) => {
-    // If no variants in database, return some fallback data for testing
-    if (localVariants.length === 0 && !sqliteDb) {
-      const fallbackVariants = [
-        { id: 1, itemId: 1, sku: 'TSH-001-S-BLK', barcode: null, price: 29.99, stock: 50, status: 1, optionIds: '[1,4]' },
-        { id: 2, itemId: 1, sku: 'TSH-001-M-BLK', barcode: null, price: 29.99, stock: 30, status: 1, optionIds: '[2,4]' },
-        { id: 3, itemId: 2, sku: 'WH-002-BLK', barcode: null, price: 199.99, stock: 15, status: 1, optionIds: '[5]' }
-      ];
-      return fallbackVariants.filter(variant => variant.itemId === itemId);
-    }
     return localVariants.filter(variant => variant.itemId === itemId);
-  }, [localVariants, sqliteDb]);
+  }, [localVariants]);
 
   const getAllOpGroups = useCallback(() => {
     return localOpGroups;
