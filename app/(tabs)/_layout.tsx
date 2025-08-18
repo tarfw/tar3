@@ -74,7 +74,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Internal Search',
+          title: 'Search',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
