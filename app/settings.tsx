@@ -68,8 +68,10 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContainer} 
         showsVerticalScrollIndicator={false}
       >
+        
+
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
@@ -83,7 +85,7 @@ export default function SettingsScreen() {
 
         {/* User Profile Card */}
         {user && (
-          <View style={styles.section}>
+          <View style={[styles.section, { marginTop: Spacing.lg }]}>
             <Text style={[TextStyles.label, { color: colors.textSecondary, marginBottom: Spacing.md }]}>
               ACCOUNT
             </Text>
@@ -173,12 +175,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 0.5,
   },
   backButton: {
     marginRight: Spacing.md,
     padding: Spacing.xs,
   },
+  
   section: {
     marginBottom: Spacing.xl,
     paddingHorizontal: Spacing.lg,

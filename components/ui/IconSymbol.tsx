@@ -84,6 +84,7 @@ const MAPPING = {
   'exclamationmark.triangle.fill': 'warning',
   'arrow.up': 'keyboard-arrow-up',
   'person': 'person',
+  'person.fill': 'person',
   'calendar': 'event',
   
   // Tab bar icons

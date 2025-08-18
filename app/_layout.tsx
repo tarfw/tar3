@@ -26,6 +26,8 @@ function AppContent() {
           <Stack.Screen name="items" options={{ headerShown: false }} />
           <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="groups" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="agents" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

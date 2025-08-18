@@ -17,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 interface CreateOption {
   icon: string;
   title: string;
-  subtitle: string;
   color: string;
   route: string;
 }
@@ -25,81 +24,50 @@ interface CreateOption {
 export default function CreateScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const styles = getStyles(colors);
 
   const createOptions: CreateOption[] = [
     {
       icon: 'cart',
-      title: 'Order',
-      subtitle: 'Create a new order',
+      title: 'Orders',
       color: colors.primary,
       route: '/create-order',
     },
     {
       icon: 'cube.box',
       title: 'Items',
-      subtitle: 'Add new items',
       color: '#10b981',
       route: '/items',
     },
     {
       icon: 'doc.text',
-      title: 'Task',
-      subtitle: 'Create a new task',
+      title: 'Tasks',
       color: colors.warning,
       route: '/create-issue',
     },
     {
       icon: 'note.text',
-      title: 'Note',
-      subtitle: 'Write a quick note',
+      title: 'Notes',
       color: '#10b981',
       route: '/notes',
     },
     {
-      icon: 'person.3',
-      title: 'Team',
-      subtitle: 'Create a new team',
-      color: colors.warning,
-      route: '/create-team',
-    },
-    {
-      icon: 'tag',
-      title: 'Label',
-      subtitle: 'Add a new label',
-      color: colors.error,
-      route: '/create-label',
+      icon: 'person',
+      title: 'Agents',
+      color: '#3b82f6',
+      route: '/agents',
     },
     {
       icon: 'square.grid.3x3',
       title: 'Groups',
-      subtitle: 'Manage option groups',
       color: '#8b5cf6',
       route: '/groups',
     },
   ];
 
-  const quickActions = [
-    {
-      icon: 'note.text',
-      title: 'Notes',
-      subtitle: 'Create and manage notes',
-      route: '/notes',
-    },
-    {
-      icon: 'square.and.arrow.down',
-      title: 'Templates',
-      subtitle: 'Use a project template',
-      route: '/templates',
-    },
-    {
-      icon: 'gearshape',
-      title: 'Settings',
-      subtitle: 'App preferences and account',
-      route: '/settings',
-    },
-  ];
+  
 
-  const renderCreateOption = (option: CreateOption, index: number) => (
+  const renderCreateOption = (option: CreateOption, index: number, styles: any) => (
     <TouchableOpacity
       key={index}
       style={[styles.createOption, { backgroundColor: colors.surface }]}
@@ -113,41 +81,7 @@ export default function CreateScreen() {
         <Text style={[TextStyles.label, { color: colors.text }]}>
           {option.title}
         </Text>
-        <Text style={[TextStyles.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-          {option.subtitle}
-        </Text>
       </View>
-      <IconSymbol size={16} name="chevron.right" color={colors.iconSecondary} />
-    </TouchableOpacity>
-  );
-
-  const renderQuickAction = (action: any, index: number) => (
-    <TouchableOpacity
-      key={index}
-      style={[styles.quickAction, { backgroundColor: colors.surface }]}
-      onPress={() => {
-        if (action.route === '/notes') {
-          router.push('/notes');
-        } else if (action.route === '/settings') {
-          router.push('/settings');
-        } else {
-          Alert.alert('Coming Soon', `${action.title} feature is not yet implemented.`);
-        }
-      }}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.quickActionIcon, { backgroundColor: colors.backgroundSecondary }]}>
-        <IconSymbol size={20} name={action.icon} color={colors.icon} />
-      </View>
-      <View style={styles.quickActionContent}>
-        <Text style={[TextStyles.body, { color: colors.text }]}>
-          {action.title}
-        </Text>
-        <Text style={[TextStyles.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-          {action.subtitle}
-        </Text>
-      </View>
-      <IconSymbol size={16} name="chevron.right" color={colors.iconSecondary} />
     </TouchableOpacity>
   );
 
@@ -170,17 +104,7 @@ export default function CreateScreen() {
         {/* Main Create Options */}
         <View style={styles.section}>
           <View style={styles.createOptionsGrid}>
-            {createOptions.map(renderCreateOption)}
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={[TextStyles.label, { color: colors.textSecondary, marginBottom: Spacing.md }]}>
-            QUICK ACTIONS
-          </Text>
-          <View style={styles.quickActionsContainer}>
-            {quickActions.map(renderQuickAction)}
+            {createOptions.map((option, index) => renderCreateOption(option, index, styles))}
           </View>
         </View>
       </ScrollView>
@@ -188,7 +112,7 @@ export default function CreateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -217,8 +141,10 @@ const styles = StyleSheet.create({
   createOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.lg,
+    padding: Spacing.md,
     borderRadius: Radius.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   iconContainer: {
     width: 48,

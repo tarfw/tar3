@@ -59,13 +59,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="explore"
         options={{
           title: 'Explore',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
-              name="globe" 
+              name="gamecontroller" 
               color={color} 
             />
           ),
@@ -74,11 +74,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="my-issues"
         options={{
-          title: 'Agents',
+          title: 'Search',
           tabBarIcon: ({ color, focused }) => (
             <IconSymbol 
               size={22} 
-              name="gamecontroller" 
+              name="magnifyingglass" 
               color={color} 
             />
           ),
