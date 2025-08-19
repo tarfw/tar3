@@ -3,8 +3,9 @@ import { Colors } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Stack, router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -12,6 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { r2Service, type MediaFile } from '@/lib/r2-service';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface FileItem {
@@ -19,9 +22,11 @@ interface FileItem {
   name: string;
   type: 'image' | 'video' | 'document';
   sizeLabel: string;
+  url?: string;
+  key?: string;
 }
 
-const sampleFiles: FileItem[] = [];
+// Local state will hold uploaded files this session
 
 export default function FilesScreen() {
   const colorScheme = useColorScheme();
@@ -30,8 +35,10 @@ export default function FilesScreen() {
 
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'images' | 'videos' | 'documents'>('all');
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [uploading, setUploading] = useState(false);
 
-  const filtered = sampleFiles.filter((f) => {
+  const filtered = files.filter((f) => {
     const matchesQuery = f.name.toLowerCase().includes(query.toLowerCase());
     const matchesType =
       typeFilter === 'all' ||
@@ -40,6 +47,62 @@ export default function FilesScreen() {
       (typeFilter === 'documents' && f.type === 'document');
     return matchesQuery && matchesType;
   });
+
+  const formatSize = useCallback((bytes?: number) => {
+    if (!bytes || bytes <= 0) return 'Unknown size';
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+  }, []);
+
+  const onPressUpload = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant photo library permissions to upload files.');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        exif: false,
+      });
+
+      if (result.canceled) return;
+
+      setUploading(true);
+      for (const asset of result.assets) {
+        const mediaFile: MediaFile = {
+          uri: asset.uri,
+          name: asset.fileName || `upload_${Date.now()}`,
+          type: asset.type === 'video' ? 'video/mp4' : 'image/jpeg',
+          size: asset.fileSize,
+        };
+        const res = await r2Service.uploadFile(mediaFile, 'media');
+        if (res.success && res.url) {
+          setFiles((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              name: mediaFile.name,
+              type: mediaFile.type.startsWith('image') ? 'image' : mediaFile.type.startsWith('video') ? 'video' : 'document',
+              sizeLabel: formatSize(mediaFile.size),
+              url: res.url,
+              key: res.key,
+            },
+          ]);
+        } else {
+          Alert.alert('Upload failed', res.error || 'Unknown error');
+        }
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to pick media');
+    } finally {
+      setUploading(false);
+    }
+  }, [formatSize]);
 
   const renderItem = ({ item }: { item: FileItem }) => (
     <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -91,13 +154,20 @@ export default function FilesScreen() {
           </View>
           <Text style={[TextStyles.h4, { color: colors.text, marginTop: 8 }]}>No files yet</Text>
           <Text style={[TextStyles.body, { color: colors.textSecondary, marginTop: 4, textAlign: 'center' }]}>Upload files to manage images, videos and documents in one place.</Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary, opacity: uploading ? 0.6 : 1 }]} activeOpacity={0.8} onPress={onPressUpload} disabled={uploading}>
             <Text style={[TextStyles.label, { color: colors.onPrimary }]}>Upload</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filtered}
+          ListHeaderComponent={
+            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
+              <TouchableOpacity style={[styles.primaryBtn, { alignSelf: 'flex-start', backgroundColor: colors.primary, opacity: uploading ? 0.6 : 1 }]} activeOpacity={0.8} onPress={onPressUpload} disabled={uploading}>
+                <Text style={[TextStyles.label, { color: colors.onPrimary }]}>Upload</Text>
+              </TouchableOpacity>
+            </View>
+          }
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
