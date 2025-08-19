@@ -2,7 +2,11 @@ import { id, init } from '@instantdb/react-native';
 import 'react-native-get-random-values'; // Required for crypto.randomUUID in React Native
 
 // You'll need to get your APP_ID from https://instantdb.com/dash
-const APP_ID = process.env.EXPO_PUBLIC_INSTANT_APP_ID || '__YOUR_APP_ID__';
+const APP_ID = process.env.EXPO_PUBLIC_INSTANT_APP_ID;
+
+if (!APP_ID) {
+  throw new Error('EXPO_PUBLIC_INSTANT_APP_ID is not set. Create a .env file and set EXPO_PUBLIC_INSTANT_APP_ID=your_app_id');
+}
 
 export const db = init({ appId: APP_ID });
 

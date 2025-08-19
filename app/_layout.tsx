@@ -47,10 +47,7 @@ export default function RootLayout() {
   }
 
   // Check if Turso is configured
-  const isTursoConfigured = Boolean(
-    "libsql://tar8-thamizhtar.aws-ap-south-1.turso.io" && 
-    "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTU1NjMyNTAsImlkIjoiZjg2NTFmZTEtMzVlOC00OWRjLWJjYWUtN2I2ZjYxM2ZiYmFlIiwicmlkIjoiMDIyMjI3ZDQtODllNS00NjBlLWFkMDYtZTBkZTgyYWI1YWU5In0.95z1IZazVuFxOSWCYe1c9wITmWKzeR66F3bb7VWMsBdhj71Q9UbSyDuSKGmBqx4lI8UUmnojnY78Ce7UElR5CA"
-  );
+  const isTursoConfigured = Boolean(tursoOptions.url && tursoOptions.authToken);
 
   return (
     <ThemeProvider>

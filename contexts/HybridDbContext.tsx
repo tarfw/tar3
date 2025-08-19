@@ -15,9 +15,9 @@ import { Comment, Issue } from '../lib/instant';
 export const TURSO_DB_NAME = 'tar.db';
 
 export const tursoOptions = {
-  url: "libsql://tar8-thamizhtar.aws-ap-south-1.turso.io",
-  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTU1NjMyNTAsImlkIjoiZjg2NTFmZTEtMzVlOC00OWRjLWJjYWUtN2I2ZjYxM2ZiYmFlIiwicmlkIjoiMDIyMjI3ZDQtODllNS00NjBlLWFkMDYtZTBkZTgyYWI1YWU5In0.95z1IZazVuFxOSWCYe1c9wITmWKzeR66F3bb7VWMsBdhj71Q9UbSyDuSKGmBqx4lI8UUmnojnY78Ce7UElR5CA",
-};
+  url: process.env.EXPO_PUBLIC_TURSO_DB_URL,
+  authToken: process.env.EXPO_PUBLIC_TURSO_DB_AUTH_TOKEN,
+} as const;
 
 // Local SQLite issue structure (for Turso local-first)
 export interface LocalIssue {
