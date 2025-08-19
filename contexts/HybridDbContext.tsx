@@ -15,8 +15,8 @@ import { Comment, Issue } from '../lib/instant';
 export const TURSO_DB_NAME = 'tar.db';
 
 export const tursoOptions = {
-  url: "libsql://tar6-thamizhtar.aws-ap-south-1.turso.io",
-  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTU0NzI2MTksImlkIjoiZTczMGE0MzUtNjVlNS00NjkyLThkZjAtN2VlOGI4NTE3ZTQxIiwicmlkIjoiNGEwZjEzOGQtODJlMC00OTNlLWE2YjAtMjZmN2FkOTg4YmQ1In0.X9G0THVRqmhyKiKlv9aL6404aWqOHt6fv0P5RuIz3Fl-7WY_HtSJ-sDwVylIKWtFtSm-1-6_Mf9As3nvMMHcAw",
+  url: "libsql://tar8-thamizhtar.aws-ap-south-1.turso.io",
+  authToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTU1NjMyNTAsImlkIjoiZjg2NTFmZTEtMzVlOC00OWRjLWJjYWUtN2I2ZjYxM2ZiYmFlIiwicmlkIjoiMDIyMjI3ZDQtODllNS00NjBlLWFkMDYtZTBkZTgyYWI1YWU5In0.95z1IZazVuFxOSWCYe1c9wITmWKzeR66F3bb7VWMsBdhj71Q9UbSyDuSKGmBqx4lI8UUmnojnY78Ce7UElR5CA",
 };
 
 // Local SQLite issue structure (for Turso local-first)

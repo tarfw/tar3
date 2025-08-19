@@ -4,18 +4,24 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, Platform, type StyleProp, type TextStyle } from 'react-native';
 
-// Conditionally import expo-symbols
+// Conditionally import expo-symbols only on iOS
 let SymbolView: any = null;
 let SymbolViewProps: any = null;
 let SymbolWeight: any = null;
+let isSymbolsAvailable = false;
 
-try {
-  const expoSymbols = require('expo-symbols');
-  SymbolView = expoSymbols.SymbolView;
-  SymbolViewProps = expoSymbols.SymbolViewProps;
-  SymbolWeight = expoSymbols.SymbolWeight;
-} catch (error) {
-  console.warn('expo-symbols not available, falling back to MaterialIcons');
+// Only attempt to load expo-symbols on iOS to avoid Android native module issues
+if (Platform.OS === 'ios') {
+  try {
+    const expoSymbols = require('expo-symbols');
+    SymbolView = expoSymbols.SymbolView;
+    SymbolViewProps = expoSymbols.SymbolViewProps;
+    SymbolWeight = expoSymbols.SymbolWeight;
+    isSymbolsAvailable = true;
+  } catch (error) {
+    console.warn('expo-symbols not available on iOS, falling back to MaterialIcons');
+    isSymbolsAvailable = false;
+  }
 }
 
 type IconMapping = Record<string, ComponentProps<typeof MaterialIcons>['name']>;
@@ -100,6 +106,7 @@ const MAPPING = {
   'cart': 'shopping-cart',
   'cube.box': 'inventory',
   'square.grid.3x3': 'grid-view',
+  'square.grid.2x2': 'apps',
 } as IconMapping;
 
 /**
@@ -120,17 +127,22 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: any;
 }) {
-  // Use native SF Symbols on iOS if available
-  if (Platform.OS === 'ios' && SymbolView) {
-    return (
-      <SymbolView
-        name={name}
-        size={size}
-        tintColor={color}
-        weight={weight}
-        style={style}
-      />
-    );
+  // Use native SF Symbols on iOS if available and properly configured
+  if (Platform.OS === 'ios' && isSymbolsAvailable && SymbolView) {
+    try {
+      return (
+        <SymbolView
+          name={name}
+          size={size}
+          tintColor={color}
+          weight={weight}
+          style={style}
+        />
+      );
+    } catch (error) {
+      console.warn(`IconSymbol: Error rendering SF Symbol "${name}", falling back to Material Icon:`, error);
+      // Fall through to Material Icons fallback
+    }
   }
 
   // Fallback to Material Icons on Android and web (or iOS if SymbolView unavailable)
