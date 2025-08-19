@@ -12,7 +12,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { r2Service, type MediaFile } from '@/lib/r2-service';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,6 +39,7 @@ export default function FilesScreen() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'images' | 'videos' | 'documents'>('all');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
 
   const filtered = files.filter((f) => {
     const matchesQuery = f.name.toLowerCase().includes(query.toLowerCase());
@@ -54,6 +57,19 @@ export default function FilesScreen() {
     const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
   }, []);
+
+  const getPreviewUrl = useCallback(async (item: FileItem) => {
+    if (!item.key || previewUrls[item.id]) return;
+    
+    try {
+      const signedUrl = await r2Service.getSignedUrl(item.key, 3600); // 1 hour expiry
+      if (signedUrl) {
+        setPreviewUrls(prev => ({ ...prev, [item.id]: signedUrl }));
+      }
+    } catch (error) {
+      console.warn('Failed to get preview URL for', item.name);
+    }
+  }, [previewUrls]);
 
   const onPressUpload = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -104,27 +120,57 @@ export default function FilesScreen() {
     }
   }, [formatSize]);
 
-  const renderItem = ({ item }: { item: FileItem }) => (
-    <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}20` }]}>
-        <IconSymbol name={item.type === 'image' ? 'photo' : item.type === 'video' ? 'play.rectangle' : 'doc.text'} size={24} color={colors.primary} />
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={[TextStyles.label, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[TextStyles.caption, { color: colors.textSecondary }]}>{item.sizeLabel}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  // Load preview URLs when files change
+  React.useEffect(() => {
+    files.forEach(file => {
+      if (file.type === 'image' && file.key && !previewUrls[file.id]) {
+        getPreviewUrl(file);
+      }
+    });
+  }, [files, getPreviewUrl, previewUrls]);
+
+  const renderItem = ({ item }: { item: FileItem }) => {
+    const previewUrl = previewUrls[item.id];
+
+    return (
+      <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}20` }]}>
+          {item.type === 'image' && previewUrl ? (
+            <Image
+              source={{ uri: previewUrl }}
+              style={styles.previewImage}
+              contentFit="cover"
+              placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+            />
+          ) : (
+            <IconSymbol 
+              name={item.type === 'image' ? 'photo' : item.type === 'video' ? 'play.rectangle' : 'doc.text'} 
+              size={24} 
+              color={colors.primary} 
+            />
+          )}
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={[TextStyles.label, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[TextStyles.caption, { color: colors.textSecondary }]}>{item.sizeLabel}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { borderBottomWidth: 0.5, borderColor: colors.border }]}>
         <Text style={[TextStyles.h4, { color: colors.text }]}>Files</Text>
-        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.headerBtn}>
-          <IconSymbol name="gearshape" size={22} color={colors.text} />
+        <TouchableOpacity onPress={onPressUpload} style={[styles.headerBtn, { opacity: uploading ? 0.6 : 1 }]} disabled={uploading}>
+          {uploading ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <IconSymbol name="plus" size={22} color={colors.text} />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -155,19 +201,12 @@ export default function FilesScreen() {
           <Text style={[TextStyles.h4, { color: colors.text, marginTop: 8 }]}>No files yet</Text>
           <Text style={[TextStyles.body, { color: colors.textSecondary, marginTop: 4, textAlign: 'center' }]}>Upload files to manage images, videos and documents in one place.</Text>
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary, opacity: uploading ? 0.6 : 1 }]} activeOpacity={0.8} onPress={onPressUpload} disabled={uploading}>
-            <Text style={[TextStyles.label, { color: colors.onPrimary }]}>Upload</Text>
+            <Text style={[TextStyles.label, { color: colors.onPrimary }]}>{uploading ? 'Uploading...' : 'Upload Files'}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filtered}
-          ListHeaderComponent={
-            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
-              <TouchableOpacity style={[styles.primaryBtn, { alignSelf: 'flex-start', backgroundColor: colors.primary, opacity: uploading ? 0.6 : 1 }]} activeOpacity={0.8} onPress={onPressUpload} disabled={uploading}>
-                <Text style={[TextStyles.label, { color: colors.onPrimary }]}>Upload</Text>
-              </TouchableOpacity>
-            </View>
-          }
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -256,5 +295,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.lg,
+  },
+  previewImage: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
   },
 });
