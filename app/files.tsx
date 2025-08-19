@@ -13,6 +13,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Modal,
+  Dimensions,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,6 +43,8 @@ export default function FilesScreen() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const filtered = files.filter((f) => {
     const matchesQuery = f.name.toLowerCase().includes(query.toLowerCase());
@@ -120,6 +125,42 @@ export default function FilesScreen() {
     }
   }, [formatSize]);
 
+  const onDeleteFile = useCallback(async (file: FileItem) => {
+    if (!file.key) return;
+    
+    Alert.alert(
+      'Delete File',
+      `Are you sure you want to delete "${file.name}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const success = await r2Service.deleteFile(file.key!);
+              if (success) {
+                setFiles(prev => prev.filter(f => f.id !== file.id));
+                setPreviewUrls(prev => {
+                  const { [file.id]: _, ...rest } = prev;
+                  return rest;
+                });
+                setSelectedFile(null);
+              } else {
+                Alert.alert('Error', 'Failed to delete file from storage');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete file');
+            } finally {
+              setDeleting(false);
+            }
+          }
+        }
+      ]
+    );
+  }, []);
+
   // Load preview URLs when files change
   React.useEffect(() => {
     files.forEach(file => {
@@ -133,8 +174,10 @@ export default function FilesScreen() {
     const previewUrl = previewUrls[item.id];
 
     return (
-      <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      <TouchableOpacity 
+        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         activeOpacity={0.7}
+        onPress={() => setSelectedFile(item)}
       >
         <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}20` }]}>
           {item.type === 'image' && previewUrl ? (
@@ -213,6 +256,99 @@ export default function FilesScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Full-screen file viewer modal */}
+      <Modal
+        visible={!!selectedFile}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setSelectedFile(null)}
+      >
+        {selectedFile && (
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            {/* Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setSelectedFile(null)} style={styles.modalCloseBtn}>
+                <IconSymbol name="xmark" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[TextStyles.h4, { color: colors.text, flex: 1, textAlign: 'center' }]}>
+                File Details
+              </Text>
+              <TouchableOpacity 
+                onPress={() => onDeleteFile(selectedFile)} 
+                style={[styles.modalDeleteBtn, { opacity: deleting ? 0.6 : 1 }]}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color={colors.destructive || '#FF3B30'} />
+                ) : (
+                  <Text style={[TextStyles.label, { color: colors.destructive || '#FF3B30' }]}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* File Preview */}
+              <View style={styles.modalPreviewContainer}>
+                {selectedFile.type === 'image' && previewUrls[selectedFile.id] ? (
+                  <Image
+                    source={{ uri: previewUrls[selectedFile.id] }}
+                    style={styles.modalPreviewImage}
+                    contentFit="contain"
+                    placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+                  />
+                ) : (
+                  <View style={[styles.modalPreviewPlaceholder, { backgroundColor: `${colors.primary}20` }]}>
+                    <IconSymbol 
+                      name={selectedFile.type === 'image' ? 'photo' : selectedFile.type === 'video' ? 'play.rectangle' : 'doc.text'} 
+                      size={80} 
+                      color={colors.primary} 
+                    />
+                  </View>
+                )}
+              </View>
+
+              {/* File Details */}
+              <View style={styles.modalDetails}>
+                <View style={[styles.modalDetailRow, { borderBottomColor: colors.border }]}>
+                  <Text style={[TextStyles.label, { color: colors.textSecondary }]}>Name</Text>
+                  <Text style={[TextStyles.body, { color: colors.text, flex: 1, textAlign: 'right' }]} numberOfLines={2}>
+                    {selectedFile.name}
+                  </Text>
+                </View>
+                
+                <View style={[styles.modalDetailRow, { borderBottomColor: colors.border }]}>
+                  <Text style={[TextStyles.label, { color: colors.textSecondary }]}>Type</Text>
+                  <Text style={[TextStyles.body, { color: colors.text }]}>
+                    {selectedFile.type.charAt(0).toUpperCase() + selectedFile.type.slice(1)}
+                  </Text>
+                </View>
+                
+                <View style={[styles.modalDetailRow, { borderBottomColor: colors.border }]}>
+                  <Text style={[TextStyles.label, { color: colors.textSecondary }]}>Size</Text>
+                  <Text style={[TextStyles.body, { color: colors.text }]}>
+                    {selectedFile.sizeLabel}
+                  </Text>
+                </View>
+                
+                {selectedFile.url && (
+                  <View style={[styles.modalDetailRow, { borderBottomColor: colors.border }]}>
+                    <Text style={[TextStyles.label, { color: colors.textSecondary }]}>URL</Text>
+                    <TouchableOpacity onPress={() => {
+                      // Copy URL to clipboard or open in browser
+                      Alert.alert('File URL', selectedFile.url, [
+                        { text: 'OK', style: 'default' }
+                      ]);
+                    }}>
+                      <Text style={[TextStyles.body, { color: colors.primary }]}>View URL</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -300,5 +436,56 @@ const getStyles = (colors: any) => StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.md,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    paddingTop: Spacing.xl,
+    borderBottomWidth: 1,
+  },
+  modalCloseBtn: {
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  modalDeleteBtn: {
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  modalContent: {
+    flex: 1,
+  },
+  modalPreviewContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xl,
+    minHeight: 300,
+  },
+  modalPreviewImage: {
+    width: Dimensions.get('window').width - (Spacing.lg * 2),
+    height: 300,
+    borderRadius: Radius.lg,
+  },
+  modalPreviewPlaceholder: {
+    width: 200,
+    height: 200,
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalDetails: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl,
+  },
+  modalDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
   },
 });
