@@ -59,6 +59,8 @@ const MAPPING = {
   'exclamationmark.2': 'error-outline',
   'minus': 'remove',
   'arrow.down': 'keyboard-arrow-down',
+  'arrow.up.circle': 'arrow-circle-up',
+  'arrow.up.circle.fill': 'arrow-circle-up',
   
   // Theme and settings icons
   'sun.max': 'wb-sunny',
@@ -69,6 +71,8 @@ const MAPPING = {
   
   // Document and content icons
   'doc.text': 'description',
+  'photo': 'photo',
+  'play.rectangle': 'play-circle-outline',
   'tag': 'label',
   'person.3': 'group',
   'square.and.arrow.down': 'download',

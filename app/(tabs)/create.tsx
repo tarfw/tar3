@@ -34,6 +34,12 @@ export default function CreateScreen() {
       route: '/create-order',
     },
     {
+      icon: 'folder',
+      title: 'Files',
+      color: '#0ea5e9',
+      route: '/files',
+    },
+    {
       icon: 'cube.box',
       title: 'Items',
       color: '#10b981',
