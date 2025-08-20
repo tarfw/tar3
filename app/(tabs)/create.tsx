@@ -75,6 +75,12 @@ export default function CreateScreen() {
       color: '#6366f1',
       route: '/aichat',
     },
+    {
+      icon: 'square.grid.3x3',
+      title: 'Tables',
+      color: '#f59e0b',
+      route: '/tables',
+    },
   ];
 
   
