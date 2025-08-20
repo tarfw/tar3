@@ -22,18 +22,21 @@ import {
   type InstantApp
 } from '@/lib/instantPlatformService';
 import { i } from '@instantdb/platform';
+import { db, id } from '@/lib/instant';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AgentsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
   
   // State management
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [apps, setApps] = useState<InstantApp[]>([]);
+  const [userApp, setUserApp] = useState<InstantApp | null>(null);
+  const [userAppRecord, setUserAppRecord] = useState<any>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newAppTitle, setNewAppTitle] = useState('');
-  const [selectedApp, setSelectedApp] = useState<InstantApp | null>(null);
   const [showAppDetails, setShowAppDetails] = useState(false);
   const [appTemplate, setAppTemplate] = useState<'todo' | 'chat' | 'custom'>('todo');
   const [showAddEntity, setShowAddEntity] = useState(false);
@@ -41,22 +44,38 @@ export default function AgentsScreen() {
   const [newEntityFields, setNewEntityFields] = useState<Array<{name: string, type: string, required: boolean}>>([]);
   const [currentField, setCurrentField] = useState({name: '', type: 'string', required: true});
 
+  // Query user's app from the database - include linked users
+  const { data: userData, isLoading: isLoadingUserData, error: userDataError } = db.useQuery(
+    user?.id ? {
+      app: {
+        $users: {}
+      }
+    } : null
+  );
+
+
   // Initialize with platform token on mount
   useEffect(() => {
     initializePlatformToken();
   }, []);
 
-  // Load apps when token is available
+  // Load user's app when token is available and user data is loaded
   useEffect(() => {
-    if (accessToken && instantPlatformService.isInitialized()) {
-      loadApps();
+    if (accessToken && instantPlatformService.isInitialized() && !isLoadingUserData && user?.id) {
+      loadUserApp();
     }
-  }, [accessToken]);
+  }, [accessToken, userData, isLoadingUserData, user?.id]);
 
   const initializePlatformToken = async () => {
     try {
-      // Use your platform token directly
-      const platformToken = 'per_341d300582100b97b1f4532037d7dae4abaa83ad8f79ff7647156d14ce5b1f02';
+      // Get platform token from environment variable
+      const platformToken = process.env.EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN;
+      
+      if (!platformToken) {
+        console.error('EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN environment variable is not set');
+        return;
+      }
+      
       await instantPlatformService.saveToken(platformToken);
       setAccessToken(platformToken);
     } catch (error) {
@@ -73,39 +92,53 @@ export default function AgentsScreen() {
     }
   };
 
-  const refreshApps = async () => {
-    await loadApps();
+  const refreshUserApp = async () => {
+    await loadUserApp();
   };
 
-  const loadApps = async () => {
-    if (!instantPlatformService.isInitialized()) return;
+  const loadUserApp = async () => {
+    if (!instantPlatformService.isInitialized() || !user?.id) return;
     
     try {
       setIsLoading(true);
       
-      // Load real apps from the API using platform token
-      const apps = await instantPlatformService.getApps({ 
-        includeSchema: true, 
-        includePerms: true 
-      });
-      setApps(apps);
+      // Get user's app record from the database
+      // Filter apps to find the one linked to current user
+      const userAppData = userData?.app?.find(app => 
+        app.$users?.some(u => u.id === user.id)
+      );
+      setUserAppRecord(userAppData);
+      
+      if (userAppData?.appid) {
+        // Load the specific app from platform API
+        const apps = await instantPlatformService.getApps({ 
+          includeSchema: true, 
+          includePerms: true 
+        });
+        
+        // Find the user's specific app
+        const foundApp = apps.find(app => app.id === userAppData.appid);
+        setUserApp(foundApp || null);
+      } else {
+        setUserApp(null);
+      }
     } catch (error) {
-      console.error('Error loading agents:', error);
-      Alert.alert('Error', `Failed to load agents: ${error.message}`);
-      setApps([]); // Clear apps on error
+      console.error('Error loading user agent:', error);
+      Alert.alert('Error', `Failed to load your agent: ${error.message}`);
+      setUserApp(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   const createApp = async () => {
-    if (!instantPlatformService.isInitialized() || !newAppTitle.trim()) return;
+    if (!instantPlatformService.isInitialized() || !newAppTitle.trim() || !user) return;
     
     // Check if user already has an app
-    if (apps.length > 0) {
+    if (userApp || userAppRecord?.appid) {
       Alert.alert(
         'Limit Reached', 
-        'You can only create one agent. You can add unlimited entities to your existing agent.',
+        'You can only create one app. You can add unlimited agents to your existing app.',
         [{ text: 'OK' }]
       );
       return;
@@ -141,11 +174,20 @@ export default function AgentsScreen() {
         perms,
       });
       
-      setApps(prev => [...prev, newApp]);
-      Alert.alert('Success', `Agent "${newAppTitle}" created successfully! You can now add unlimited entities to customize your agent.`);
+      // Store the app ID in the user's app record
+      const appRecordId = userAppRecord?.id || id();
+      await db.transact([
+        db.tx.app[appRecordId].update({
+          appid: newApp.id
+        }).link({ $users: user.id })
+      ]);
       
-      // Refresh the apps list to get the latest data
-      await refreshApps();
+      
+      setUserApp(newApp);
+      Alert.alert('Success', `App "${newAppTitle}" created successfully! You can now add unlimited agents to your app.`);
+      
+      // Refresh the user's app data
+      await refreshUserApp();
       
       setNewAppTitle('');
       setShowCreateModal(false);
@@ -157,12 +199,12 @@ export default function AgentsScreen() {
     }
   };
 
-  const deleteApp = async (appId: string) => {
-    if (!instantPlatformService.isInitialized()) return;
+  const deleteApp = async () => {
+    if (!instantPlatformService.isInitialized() || !userApp || !userAppRecord) return;
     
     Alert.alert(
-      'Delete Agent',
-      'Are you sure you want to delete this agent? This action cannot be undone.',
+      'Delete App',
+      'Are you sure you want to delete this app? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -173,14 +215,20 @@ export default function AgentsScreen() {
               setIsLoading(true);
               
               // Delete via API
-              await instantPlatformService.deleteApp(appId);
+              await instantPlatformService.deleteApp(userApp.id);
               
-              // Remove from local state
-              setApps(prev => prev.filter(app => app.id !== appId));
-              Alert.alert('Success', 'Agent deleted successfully');
+              // Remove app ID from user's record
+              await db.transact([
+                db.tx.app[userAppRecord.id].update({
+                  appid: null
+                })
+              ]);
               
-              // Refresh the apps list
-              await refreshApps();
+              setUserApp(null);
+              Alert.alert('Success', 'App deleted successfully');
+              
+              // Refresh the user's app data
+              await refreshUserApp();
             } catch (error) {
               console.error('Error deleting agent:', error);
               Alert.alert('Error', `Failed to delete agent: ${error.message}`);
@@ -197,7 +245,8 @@ export default function AgentsScreen() {
     try {
       await instantPlatformService.clearToken();
       setAccessToken(null);
-      setApps([]);
+      setUserApp(null);
+      setUserAppRecord(null);
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -215,7 +264,7 @@ export default function AgentsScreen() {
   };
 
   const createCustomEntity = async () => {
-    if (!selectedApp || !newEntityName.trim()) return;
+    if (!userApp || !newEntityName.trim()) return;
     
     try {
       setIsLoading(true);
@@ -244,7 +293,7 @@ export default function AgentsScreen() {
       }, {} as any);
 
       // Get current schema and add new entity
-      const currentSchema = await instantPlatformService.getSchema(selectedApp.id);
+      const currentSchema = await instantPlatformService.getSchema(userApp.id);
       const newSchema = {
         ...currentSchema,
         entities: {
@@ -254,17 +303,17 @@ export default function AgentsScreen() {
       };
 
       // Push updated schema
-      await instantPlatformService.schemaPush(selectedApp.id, newSchema);
+      await instantPlatformService.schemaPush(userApp.id, newSchema);
       
       // Reset form
       setNewEntityName('');
       setNewEntityFields([]);
       setShowAddEntity(false);
       
-      Alert.alert('Success', `Entity "${newEntityName}" added successfully!`);
+      Alert.alert('Success', `Agent "${newEntityName}" added successfully!`);
       
-      // Refresh apps to get updated schema
-      await refreshApps();
+      // Refresh user app to get updated schema
+      await refreshUserApp();
     } catch (error) {
       console.error('Error creating entity:', error);
       Alert.alert('Error', `Failed to create entity: ${error.message}`);
@@ -282,33 +331,34 @@ export default function AgentsScreen() {
     }));
   };
 
-  const renderAppCard = (app: InstantApp) => (
-    <View key={app.id} style={[styles.appCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.appCardHeader}>
-        <Text style={[styles.appTitle, { color: colors.text }]}>{app.title}</Text>
-        <View style={styles.appActions}>
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedApp(app);
-              setShowAppDetails(true);
-            }}
-            style={styles.actionButton}
-          >
-            <Text style={[styles.actionButtonText, { color: colors.primary }]}>View</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => deleteApp(app.id)}
-            style={styles.actionButton}
-          >
-            <Text style={[styles.actionButtonText, { color: '#ef4444' }]}>Delete</Text>
-          </TouchableOpacity>
+  const renderUserAppCard = () => {
+    if (!userApp) return null;
+    
+    return (
+      <View style={[styles.appCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.appCardHeader}>
+          <Text style={[styles.appTitle, { color: colors.text }]}>{userApp.title}</Text>
+          <View style={styles.appActions}>
+            <TouchableOpacity
+              onPress={() => setShowAppDetails(true)}
+              style={styles.actionButton}
+            >
+              <Text style={[styles.actionButtonText, { color: colors.primary }]}>View</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => deleteApp()}
+              style={styles.actionButton}
+            >
+              <Text style={[styles.actionButtonText, { color: '#ef4444' }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+        <Text style={[styles.appDate, { color: colors.textSecondary }]}>
+          Created: {new Date(userApp.createdAt).toLocaleDateString()}
+        </Text>
       </View>
-      <Text style={[styles.appDate, { color: colors.textSecondary }]}>
-        Created: {new Date(app.createdAt).toLocaleDateString()}
-      </Text>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -325,15 +375,15 @@ export default function AgentsScreen() {
             <IconSymbol size={24} name="chevron.left" color={colors.text} />
           </TouchableOpacity>
           <Text style={[TextStyles.h2, { color: colors.text }]}>
-            Agents
+            My Agents
           </Text>
-          {accessToken && apps.length === 0 && (
+          {accessToken && !userApp && (
             <TouchableOpacity
               onPress={() => setShowCreateModal(true)}
               style={styles.createButton}
             >
               <Text style={[styles.createButtonText, { color: colors.primary }]}>
-                + Create
+                + Create App
               </Text>
             </TouchableOpacity>
           )}
@@ -345,26 +395,26 @@ export default function AgentsScreen() {
             <View style={styles.loginSection}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.title, { color: colors.text, marginTop: Spacing.lg }]}>
-                Initializing Agents
+                Initializing App
               </Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Setting up your agent platform...
+                Setting up your app for agents...
               </Text>
             </View>
           ) : (
-            // Apps List Section
+            // User App Section
             <View style={styles.appsSection}>
-              {isLoading ? (
+              {isLoading || isLoadingUserData ? (
                 <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
-              ) : apps.length === 0 ? (
+              ) : !userApp ? (
                 <View style={styles.emptyState}>
                   <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    No agent found. Create your agent to get started! You can add unlimited entities to customize it.
+                    No app found. Create your app to get started! You can then add unlimited agents as entities.
                   </Text>
                 </View>
               ) : (
                 <View style={styles.appsList}>
-                  {apps.map(renderAppCard)}
+                  {renderUserAppCard()}
                 </View>
               )}
             </View>
@@ -383,7 +433,7 @@ export default function AgentsScreen() {
             <TouchableOpacity onPress={() => setShowCreateModal(false)}>
               <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Create New Agent</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Create New App</Text>
             <TouchableOpacity onPress={createApp} disabled={!newAppTitle.trim() || isLoading}>
               <Text style={[styles.modalSaveText, { 
                 color: newAppTitle.trim() && !isLoading ? colors.primary : colors.textSecondary 
@@ -394,7 +444,7 @@ export default function AgentsScreen() {
           </View>
           
           <View style={styles.modalContent}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Agent Name</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>App Name</Text>
             <TextInput
               style={[styles.textInput, { 
                 backgroundColor: colors.card, 
@@ -403,11 +453,11 @@ export default function AgentsScreen() {
               }]}
               value={newAppTitle}
               onChangeText={setNewAppTitle}
-              placeholder="Enter agent name..."
+              placeholder="Enter app name..."
               placeholderTextColor={colors.textSecondary}
             />
             
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Agent Template</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>App Template</Text>
             <View style={styles.templateSelector}>
               <TouchableOpacity
                 style={[
@@ -423,13 +473,13 @@ export default function AgentsScreen() {
                   styles.templateOptionText,
                   { color: appTemplate === 'todo' ? colors.background : colors.text }
                 ]}>
-                  📝 Task Agent
+                  📝 Task App
                 </Text>
                 <Text style={[
                   styles.templateDescription,
                   { color: appTemplate === 'todo' ? colors.background : colors.textSecondary }
                 ]}>
-                  Manages tasks and user assignments
+                  App for task management agents
                 </Text>
               </TouchableOpacity>
               
@@ -447,13 +497,13 @@ export default function AgentsScreen() {
                   styles.templateOptionText,
                   { color: appTemplate === 'chat' ? colors.background : colors.text }
                 ]}>
-                  💬 Chat Agent
+                  💬 Chat App
                 </Text>
                 <Text style={[
                   styles.templateDescription,
                   { color: appTemplate === 'chat' ? colors.background : colors.textSecondary }
                 ]}>
-                  Handles conversations and messaging
+                  App for chat and messaging agents
                 </Text>
               </TouchableOpacity>
               
@@ -471,21 +521,21 @@ export default function AgentsScreen() {
                   styles.templateOptionText,
                   { color: appTemplate === 'custom' ? colors.background : colors.text }
                 ]}>
-                  🛠️ Custom Agent
+                  🛠️ Custom App
                 </Text>
                 <Text style={[
                   styles.templateDescription,
                   { color: appTemplate === 'custom' ? colors.background : colors.textSecondary }
                 ]}>
-                  Build your own agent configuration
+                  Build your own app for custom agents
                 </Text>
               </TouchableOpacity>
             </View>
             
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              {appTemplate === 'todo' && 'Creates a task management agent with todos and users, including permissions for user-owned data.'}
-              {appTemplate === 'chat' && 'Creates a conversational agent with messages, channels, and users for chat functionality.'}
-              {appTemplate === 'custom' && 'Creates a blank agent where you can define your own configuration and capabilities later.'}
+              {appTemplate === 'todo' && 'Creates an app with task management entities (todos, users) for building task-related agents.'}
+              {appTemplate === 'chat' && 'Creates an app with messaging entities (messages, channels, users) for building chat agents.'}
+              {appTemplate === 'custom' && 'Creates a blank app where you can add your own entities to build custom agents.'}
             </Text>
           </View>
         </SafeAreaView>
@@ -502,29 +552,29 @@ export default function AgentsScreen() {
             <TouchableOpacity onPress={() => setShowAppDetails(false)}>
               <Text style={[styles.modalCancelText, { color: colors.primary }]}>Close</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Agent Details</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>App Details</Text>
             <TouchableOpacity onPress={() => setShowAddEntity(true)}>
-              <Text style={[styles.modalCancelText, { color: colors.primary }]}>+ Entity</Text>
+              <Text style={[styles.modalCancelText, { color: colors.primary }]}>+ Agent</Text>
             </TouchableOpacity>
           </View>
           
-          {selectedApp && (
+          {userApp && (
             <ScrollView style={styles.modalContent}>
-              <Text style={[styles.detailLabel, { color: colors.text }]}>Agent Name</Text>
-              <Text style={[styles.detailValue, { color: colors.textSecondary }]}>{selectedApp.title}</Text>
+              <Text style={[styles.detailLabel, { color: colors.text }]}>App Name</Text>
+              <Text style={[styles.detailValue, { color: colors.textSecondary }]}>{userApp.title}</Text>
               
-              <Text style={[styles.detailLabel, { color: colors.text }]}>Agent ID</Text>
-              <Text style={[styles.detailValue, { color: colors.textSecondary }]}>{selectedApp.id}</Text>
+              <Text style={[styles.detailLabel, { color: colors.text }]}>App ID</Text>
+              <Text style={[styles.detailValue, { color: colors.textSecondary }]}>{userApp.id}</Text>
               
               <Text style={[styles.detailLabel, { color: colors.text }]}>Created</Text>
               <Text style={[styles.detailValue, { color: colors.textSecondary }]}>
-                {new Date(selectedApp.createdAt).toLocaleString()}
+                {new Date(userApp.createdAt).toLocaleString()}
               </Text>
               
-              {selectedApp.schema && selectedApp.schema.entities && (
+              {userApp.schema && userApp.schema.entities && (
                 <>
-                  <Text style={[styles.detailLabel, { color: colors.text }]}>Schema Entities</Text>
-                  {Object.entries(selectedApp.schema.entities).map(([entityName, entity]: [string, any]) => (
+                  <Text style={[styles.detailLabel, { color: colors.text }]}>Agents</Text>
+                  {Object.entries(userApp.schema.entities).map(([entityName, entity]: [string, any]) => (
                     <View key={entityName} style={[styles.entityCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <Text style={[styles.entityName, { color: colors.text }]}>{entityName}</Text>
                       {getEntityFields(entity).map((field, index) => (
@@ -542,7 +592,7 @@ export default function AgentsScreen() {
                 </>
               )}
               
-              {selectedApp.perms && (
+              {userApp.perms && (
                 <>
                   <Text style={[styles.detailLabel, { color: colors.text }]}>Permissions</Text>
                   <Text style={[styles.detailValue, { color: colors.textSecondary }]}>
@@ -566,7 +616,7 @@ export default function AgentsScreen() {
             <TouchableOpacity onPress={() => setShowAddEntity(false)}>
               <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Add Entity</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Add Agent</Text>
             <TouchableOpacity onPress={createCustomEntity} disabled={!newEntityName.trim() || isLoading}>
               <Text style={[styles.modalSaveText, { 
                 color: newEntityName.trim() && !isLoading ? colors.primary : colors.textSecondary 
@@ -577,7 +627,7 @@ export default function AgentsScreen() {
           </View>
           
           <ScrollView style={styles.modalContent}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Entity Name</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Agent Name</Text>
             <TextInput
               style={[styles.textInput, { 
                 backgroundColor: colors.card, 
@@ -586,7 +636,7 @@ export default function AgentsScreen() {
               }]}
               value={newEntityName}
               onChangeText={setNewEntityName}
-              placeholder="Enter entity name..."
+              placeholder="Enter agent name..."
               placeholderTextColor={colors.textSecondary}
             />
             
