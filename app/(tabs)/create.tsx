@@ -69,6 +69,12 @@ export default function CreateScreen() {
       color: '#8b5cf6',
       route: '/groups',
     },
+    {
+      icon: 'message',
+      title: 'AI Chat',
+      color: '#6366f1',
+      route: '/aichat',
+    },
   ];
 
   
