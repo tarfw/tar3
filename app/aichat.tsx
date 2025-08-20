@@ -2,6 +2,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { Radius, Spacing, TextStyles } from '@/constants/Typography';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { generateAIResponse } from '@/lib/ai';
 import { router } from 'expo-router';
 import React, { useState, useRef } from 'react';
 import {
@@ -13,6 +14,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,7 +33,7 @@ export default function AIChatScreen() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your AI assistant. How can I help you today?',
+      text: 'Hello! I\'m your AI assistant powered by Groq. I can help you with questions, provide information, assist with tasks, and have conversations. How can I help you today?',
       isUser: false,
       timestamp: new Date(),
     },
@@ -41,7 +43,7 @@ export default function AIChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const sendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isTyping) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -50,6 +52,7 @@ export default function AIChatScreen() {
       timestamp: new Date(),
     };
 
+    const messageText = inputText.trim();
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsTyping(true);
@@ -59,11 +62,13 @@ export default function AIChatScreen() {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Get AI response using Groq
+      const aiResponseText = await generateAIResponse(messageText);
+      
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'I understand your message. This is a demo AI chat interface. In a real implementation, this would connect to an AI service to provide intelligent responses.',
+        text: aiResponseText,
         isUser: false,
         timestamp: new Date(),
       };
@@ -74,7 +79,26 @@ export default function AIChatScreen() {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
-    }, 1500);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsTyping(false);
+      
+      // Show error message
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: 'Sorry, I encountered an error. Please check your internet connection and API key configuration.',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, errorResponse]);
+      
+      Alert.alert(
+        'Connection Error',
+        'Unable to connect to AI service. Please check your API key configuration.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const renderMessage = (message: Message) => (
@@ -87,7 +111,7 @@ export default function AIChatScreen() {
     >
       {!message.isUser && (
         <View style={[styles.avatarContainer, { backgroundColor: colors.primary + '20' }]}>
-          <IconSymbol size={16} name="brain" color={colors.primary} />
+          <IconSymbol size={16} name="sparkles" color={colors.primary} />
         </View>
       )}
       <View
@@ -118,7 +142,7 @@ export default function AIChatScreen() {
   const renderTypingIndicator = () => (
     <View style={[styles.messageContainer, styles.aiMessage]}>
       <View style={[styles.avatarContainer, { backgroundColor: colors.primary + '20' }]}>
-        <IconSymbol size={16} name="brain" color={colors.primary} />
+        <IconSymbol size={16} name="sparkles" color={colors.primary} />
       </View>
       <View style={[styles.messageBubble, { backgroundColor: colors.surface }]}>
         <View style={styles.typingIndicator}>

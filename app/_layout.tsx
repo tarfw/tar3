@@ -1,10 +1,17 @@
+// Polyfills for React Native
+import 'react-native-get-random-values';
+import 'react-native-reanimated';
+
+// Polyfill for structuredClone (required by AI SDK)
+if (typeof globalThis.structuredClone === 'undefined') {
+  globalThis.structuredClone = (obj: any) => JSON.parse(JSON.stringify(obj));
+}
+
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-get-random-values';
-import 'react-native-reanimated';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { HybridDbProvider, TURSO_DB_NAME, tursoOptions } from '@/contexts/HybridDbContext';

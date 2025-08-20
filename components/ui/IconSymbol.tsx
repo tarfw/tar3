@@ -111,6 +111,8 @@ const MAPPING = {
   'cube.box': 'inventory',
   'square.grid.3x3': 'grid-view',
   'square.grid.2x2': 'apps',
+  'sparkles': 'auto-awesome',
+  'message': 'message',
 } as IconMapping;
 
 /**
