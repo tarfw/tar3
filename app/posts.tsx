@@ -1,16 +1,21 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import NotionBlockEditor, { Block, NotionBlockEditorMethods } from '@/components/ui/NotionBlockEditor';
+import NotionToolbar from '@/components/ui/NotionToolbar';
 import { Colors } from '@/constants/Colors';
-import { Radius, Spacing, TextStyles } from '@/constants/Typography';
+import { Radius, Spacing } from '@/constants/Typography';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { db, id } from '@/lib/instant';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -34,6 +39,7 @@ export default function PostsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const editorRef = useRef<NotionBlockEditorMethods>(null);
   
   // State management
   const [posts, setPosts] = useState<Post[]>([]);
@@ -45,6 +51,7 @@ export default function PostsScreen() {
     tags: '',
     status: 'draft' as Post['status']
   });
+  const [editorBlocks, setEditorBlocks] = useState<Block[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | Post['status']>('all');
 
@@ -63,13 +70,26 @@ export default function PostsScreen() {
 
   useEffect(() => {
     if (postsData?.posts) {
-      setPosts(postsData.posts);
+      setPosts(postsData.posts as Post[]);
     }
   }, [postsData]);
 
   const createPost = async () => {
-    if (!newPost.title.trim() || !newPost.content.trim() || !user?.id) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    // Extract title and content from blocks
+    const titleBlock = editorBlocks.find(block => block.type === 'title');
+    const contentBlocks = editorBlocks.filter(block => block.type !== 'title' && block.content.trim());
+    
+    const title = titleBlock?.content.trim() || '';
+    const content = contentBlocks.map(block => {
+      const prefix = block.type === 'bullet' ? '• ' : 
+                    block.type === 'task' ? '☐ ' :
+                    block.type === 'quote' ? '> ' :
+                    block.type.startsWith('heading') ? `${'#'.repeat(parseInt(block.type.slice(-1)))} ` : '';
+      return prefix + block.content;
+    }).join('\n\n');
+
+    if (!title || !user?.id) {
+      Alert.alert('Error', 'Please add a title to your post');
       return;
     }
 
@@ -81,8 +101,8 @@ export default function PostsScreen() {
       
       await db.transact([
         db.tx.posts[postId].update({
-          title: newPost.title.trim(),
-          content: newPost.content.trim(),
+          title,
+          content: content || 'No content',
           author: user.id,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -98,6 +118,7 @@ export default function PostsScreen() {
         tags: '',
         status: 'draft'
       });
+      setEditorBlocks([]);
       setShowCreateModal(false);
       
       Alert.alert('Success', 'Post created successfully!');
@@ -259,7 +280,7 @@ export default function PostsScreen() {
           >
             <IconSymbol size={24} name="chevron.left" color={colors.text} />
           </TouchableOpacity>
-          <Text style={[TextStyles.h2, { color: colors.text }]}>
+          <Text style={[{ fontSize: 20, fontWeight: '600' as const, color: colors.text }]}>
             AI Posts
           </Text>
           <TouchableOpacity
@@ -347,97 +368,151 @@ export default function PostsScreen() {
         </View>
       </ScrollView>
 
-      {/* Create Post Modal */}
+      {/* Create Post Modal - Notion Style */}
       <Modal
         visible={showCreateModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="fullScreen"
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+        <SafeAreaView style={[styles.notionModalContainer, { backgroundColor: colors.background }]}>
+          <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+          
+          {/* Header */}
+          <View style={[styles.notionHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity
-              onPress={() => setShowCreateModal(false)}
-              style={styles.modalCloseButton}
+              onPress={() => {
+                setShowCreateModal(false);
+                setEditorBlocks([]);
+              }}
+              style={styles.notionBackButton}
             >
-              <Text style={[styles.modalCloseText, { color: colors.primary }]}>Cancel</Text>
+              <IconSymbol size={24} name="chevron.left" color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Create Post</Text>
-            <TouchableOpacity
-              onPress={createPost}
-              style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
-              disabled={isLoading || !newPost.title.trim() || !newPost.content.trim()}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={colors.background} />
-              ) : (
-                <Text style={[styles.modalSaveText, { color: colors.background }]}>Create</Text>
-              )}
-            </TouchableOpacity>
+            
+            <View style={styles.notionHeaderCenter}>
+              <Text style={[styles.notionHeaderTitle, { color: colors.text }]}>New Post</Text>
+            </View>
+            
+            <View style={styles.notionHeaderRight}>
+              {/* Status Selector */}
+              <TouchableOpacity
+                style={[
+                  styles.statusButton,
+                  {
+                    backgroundColor: newPost.status === 'published' ? '#10b981' : colors.backgroundSecondary,
+                  }
+                ]}
+                onPress={() => {
+                  setNewPost(prev => ({
+                    ...prev,
+                    status: prev.status === 'draft' ? 'published' : 'draft'
+                  }));
+                }}
+              >
+                <Text style={[
+                  styles.statusButtonText,
+                  {
+                    color: newPost.status === 'published' ? '#ffffff' : colors.text,
+                  }
+                ]}>
+                  {newPost.status === 'draft' ? 'Draft' : 'Published'}
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Create Button */}
+              <TouchableOpacity
+                onPress={createPost}
+                style={[
+                  styles.notionCreateButton,
+                  {
+                    backgroundColor: editorBlocks.some(b => b.type === 'title' && b.content.trim()) ? colors.primary : colors.backgroundSecondary,
+                  }
+                ]}
+                disabled={isLoading || !editorBlocks.some(b => b.type === 'title' && b.content.trim())}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.background} />
+                ) : (
+                  <Text style={[
+                    styles.notionCreateButtonText,
+                    {
+                      color: editorBlocks.some(b => b.type === 'title' && b.content.trim()) ? colors.background : colors.textSecondary,
+                    }
+                  ]}>
+                    Create
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Title *</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Enter post title..."
-                placeholderTextColor={colors.textSecondary}
-                value={newPost.title}
-                onChangeText={(text) => setNewPost(prev => ({ ...prev, title: text }))}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Content *</Text>
-              <TextInput
-                style={[styles.formTextArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Write your post content..."
-                placeholderTextColor={colors.textSecondary}
-                value={newPost.content}
-                onChangeText={(text) => setNewPost(prev => ({ ...prev, content: text }))}
-                multiline
-                numberOfLines={8}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Tags</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Enter tags separated by commas..."
-                placeholderTextColor={colors.textSecondary}
-                value={newPost.tags}
-                onChangeText={(text) => setNewPost(prev => ({ ...prev, tags: text }))}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: colors.text }]}>Status</Text>
-              <View style={styles.statusSelector}>
-                {(['draft', 'published'] as const).map((status) => (
-                  <TouchableOpacity
-                    key={status}
-                    onPress={() => setNewPost(prev => ({ ...prev, status }))}
-                    style={[
-                      styles.statusOption,
-                      {
-                        backgroundColor: newPost.status === status ? colors.primary : colors.surface,
-                        borderColor: colors.border
-                      }
-                    ]}
-                  >
-                    <Text style={[
-                      styles.statusOptionText,
-                      { color: newPost.status === status ? colors.background : colors.text }
-                    ]}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </ScrollView>
+          {/* Content Area */}
+          <KeyboardAvoidingView
+            style={styles.notionContent}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
+            <NotionBlockEditor
+              ref={editorRef}
+              initialBlocks={[{ id: '1', type: 'title', content: '' }]}
+              onBlocksChange={setEditorBlocks}
+              autoFocus
+            />
+            
+            {/* Bottom Toolbar */}
+            <NotionToolbar
+              onAIAssist={() => {
+                // AI assistance - insert sample text
+                editorRef.current?.insertText('✨ AI-generated content: This is a sample of how AI assistance would work.');
+              }}
+              onSelectBlockType={(blockType) => {
+                // Add new block of selected type
+                editorRef.current?.addBlock(blockType);
+              }}
+              onTextStyle={() => {
+                // Transform current block to different heading
+                const currentType = editorRef.current?.getCurrentBlockType();
+                if (currentType === 'text') {
+                  editorRef.current?.transformCurrentBlock('heading1');
+                } else if (currentType === 'heading1') {
+                  editorRef.current?.transformCurrentBlock('heading2');
+                } else if (currentType === 'heading2') {
+                  editorRef.current?.transformCurrentBlock('heading3');
+                } else {
+                  editorRef.current?.transformCurrentBlock('text');
+                }
+              }}
+              onList={() => {
+                // Add bullet list block
+                editorRef.current?.addBlock('bullet');
+              }}
+              onImage={() => {
+                // Insert image placeholder
+                editorRef.current?.insertText('🖼️ [Image placeholder - Image upload coming soon]');
+              }}
+              onTurnInto={() => {
+                // Transform current block to quote
+                const currentType = editorRef.current?.getCurrentBlockType();
+                if (currentType === 'quote') {
+                  editorRef.current?.transformCurrentBlock('text');
+                } else {
+                  editorRef.current?.transformCurrentBlock('quote');
+                }
+              }}
+              onUndo={() => {
+                // Undo last change
+                editorRef.current?.undo();
+              }}
+              onComment={() => {
+                // Add comment placeholder
+                editorRef.current?.insertText(' 💬 [Comment]');
+              }}
+              onMention={() => {
+                // Add mention
+                editorRef.current?.insertText('@mention ');
+              }}
+            />
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -703,5 +778,58 @@ const styles = StyleSheet.create({
   statusOptionText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+
+  // Notion-style modal styles
+  notionModalContainer: {
+    flex: 1,
+  },
+  notionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    minHeight: 56,
+  },
+  notionBackButton: {
+    padding: Spacing.sm,
+    marginRight: Spacing.sm,
+  },
+  notionHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  notionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  notionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  statusButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  statusButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  notionCreateButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  notionCreateButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  notionContent: {
+    flex: 1,
   },
 });

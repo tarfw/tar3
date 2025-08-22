@@ -114,6 +114,18 @@ const MAPPING = {
   'square.grid.2x2': 'apps',
   'sparkles': 'auto-awesome',
   'message': 'message',
+  
+  // Notion editor toolbar icons
+  'arrow.uturn.backward': 'undo',
+  'bubble.left': 'chat-bubble-outline',
+  'line.3.horizontal': 'drag-handle',
+  'textformat': 'format-color-text',
+  'arrow.triangle.2.circlepath': 'sync',
+  'textformat.size': 'format-size',
+  'quote.bubble': 'format-quote',
+  'curlybraces': 'code',
+  'checkmark.square': 'check-box-outline-blank',
+  'square': 'check-box-outline-blank',
 } as IconMapping;
 
 /**
