@@ -71,6 +71,7 @@ const MAPPING = {
   
   // Document and content icons
   'doc.text': 'description',
+  'doc.richtext': 'article',
   'photo': 'photo',
   'play.rectangle': 'play-circle-outline',
   'tag': 'label',

@@ -81,6 +81,12 @@ export default function CreateScreen() {
       color: '#f59e0b',
       route: '/tables',
     },
+    {
+      icon: 'doc.richtext',
+      title: 'Posts',
+      color: '#ec4899',
+      route: '/posts',
+    },
   ];
 
   

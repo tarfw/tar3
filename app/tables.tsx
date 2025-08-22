@@ -30,10 +30,15 @@ export default function TablesScreen() {
   const [entities, setEntities] = useState<any[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEntityDetails, setShowEntityDetails] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<any>(null);
   const [newEntityName, setNewEntityName] = useState('');
   const [newEntityFields, setNewEntityFields] = useState<Array<{name: string, type: string, required: boolean}>>([]);
   const [currentField, setCurrentField] = useState({name: '', type: 'string', required: true});
+  const [editingEntity, setEditingEntity] = useState<any>(null);
+  const [editingFields, setEditingFields] = useState<Array<{name: string, type: string, required: boolean, isNew?: boolean}>>([]);
+  const [editingField, setEditingField] = useState({name: '', type: 'string', required: true});
+  const [editFieldIndex, setEditFieldIndex] = useState<number | null>(null);
 
   // Load entities when component mounts or userApp changes
   useEffect(() => {
@@ -48,23 +53,75 @@ export default function TablesScreen() {
       return;
     }
 
-    const entitiesList = Object.entries(userApp.schema.entities).map(([name, entity]: [string, any]) => ({
-      name,
-      fields: getEntityFields(entity),
-      entity
-    }));
+    const entitiesList = Object.entries(userApp.schema.entities).map(([name, entity]: [string, any]) => {
+      console.log(`Entity "${name}" structure:`, JSON.stringify(entity, null, 2));
+      const fields = getEntityFields(entity);
+      console.log(`Entity "${name}" extracted fields:`, fields);
+      
+      return {
+        name,
+        fields,
+        entity
+      };
+    });
 
     setEntities(entitiesList);
     console.log('Loaded entities:', entitiesList.length);
   };
 
   const getEntityFields = (entity: any) => {
-    if (!entity || !entity.fields) return [];
-    return Object.entries(entity.fields).map(([name, field]: [string, any]) => ({
-      name,
-      type: field.type || 'string',
-      required: !field.optional
-    }));
+    if (!entity) return [];
+    
+    // Handle different possible schema structures
+    let fields = {};
+    
+    if (entity.fields) {
+      // If fields are nested under a fields property
+      fields = entity.fields;
+    } else if (entity.attrs) {
+      // If fields are stored as attrs (InstantDB internal structure)
+      fields = entity.attrs;
+    } else if (typeof entity === 'object') {
+      // If the entity itself contains the field definitions
+      fields = entity;
+    }
+    
+    if (!fields || typeof fields !== 'object') return [];
+    
+    return Object.entries(fields).map(([name, field]: [string, any]) => {
+      // Handle different field definition structures
+      let type = 'string';
+      let required = true;
+      
+      if (field && typeof field === 'object') {
+        // Check for type information
+        if (field.type) {
+          type = field.type;
+        } else if (field.cardinality) {
+          // InstantDB internal structure
+          switch (field.cardinality) {
+            case 'one':
+              type = field.valueType || 'string';
+              break;
+            default:
+              type = 'string';
+          }
+        }
+        
+        // Check for optional/required status
+        if (field.hasOwnProperty('optional')) {
+          required = !field.optional;
+        } else if (field.hasOwnProperty('required')) {
+          required = field.required;
+        }
+      }
+      
+      return {
+        name,
+        type,
+        required
+      };
+    });
   };
 
   const addFieldToEntity = () => {
@@ -143,6 +200,151 @@ export default function TablesScreen() {
     setShowEntityDetails(true);
   };
 
+  const editEntity = (entity: any) => {
+    setEditingEntity(entity);
+    setEditingFields([...entity.fields]);
+    setShowEntityDetails(false);
+    setShowEditModal(true);
+  };
+
+  const addFieldToEditingEntity = () => {
+    if (editingField.name.trim()) {
+      setEditingFields(prev => [...prev, { ...editingField, isNew: true }]);
+      setEditingField({name: '', type: 'string', required: true});
+    }
+  };
+
+  const removeFieldFromEditingEntity = (index: number) => {
+    setEditingFields(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const startEditField = (index: number) => {
+    const field = editingFields[index];
+    setEditingField({ name: field.name, type: field.type, required: field.required });
+    setEditFieldIndex(index);
+  };
+
+  const saveEditField = () => {
+    if (editFieldIndex !== null && editingField.name.trim()) {
+      setEditingFields(prev => prev.map((field, index) => 
+        index === editFieldIndex ? { ...editingField } : field
+      ));
+      setEditFieldIndex(null);
+      setEditingField({name: '', type: 'string', required: true});
+    }
+  };
+
+  const cancelEditField = () => {
+    setEditFieldIndex(null);
+    setEditingField({name: '', type: 'string', required: true});
+  };
+
+  const updateEntity = async () => {
+    if (!userApp || !editingEntity) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Create updated entity schema
+      const entitySchema = editingFields.reduce((acc, field) => {
+        let fieldDef;
+        switch (field.type) {
+          case 'string':
+            fieldDef = field.required ? i.string() : i.string().optional();
+            break;
+          case 'number':
+            fieldDef = field.required ? i.number() : i.number().optional();
+            break;
+          case 'boolean':
+            fieldDef = field.required ? i.boolean() : i.boolean().optional();
+            break;
+          case 'date':
+            fieldDef = field.required ? i.date() : i.date().optional();
+            break;
+          default:
+            fieldDef = field.required ? i.string() : i.string().optional();
+        }
+        acc[field.name] = fieldDef;
+        return acc;
+      }, {} as any);
+
+      // Get current schema and update entity
+      const currentSchema = await instantPlatformService.getSchema(userApp.id);
+      const newSchema = {
+        ...currentSchema,
+        entities: {
+          ...currentSchema.entities,
+          [editingEntity.name]: i.entity(entitySchema)
+        }
+      };
+
+      // Push updated schema
+      await instantPlatformService.schemaPush(userApp.id, newSchema);
+      
+      // Reset form
+      setEditingEntity(null);
+      setEditingFields([]);
+      setShowEditModal(false);
+      
+      Alert.alert('Success', `Table "${editingEntity.name}" updated successfully!`);
+      
+      // Refresh user app to get updated schema
+      await refreshUserApp();
+      
+    } catch (error) {
+      console.error('Error updating entity:', error);
+      Alert.alert('Error', `Failed to update table: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteEntity = async (entityName: string) => {
+    if (!userApp) return;
+    
+    Alert.alert(
+      'Delete Table',
+      `Are you sure you want to delete the table "${entityName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              
+              // Get current schema and remove entity
+              const currentSchema = await instantPlatformService.getSchema(userApp.id);
+              const newEntities = { ...currentSchema.entities };
+              delete newEntities[entityName];
+              
+              const newSchema = {
+                ...currentSchema,
+                entities: newEntities
+              };
+
+              // Push updated schema
+              await instantPlatformService.schemaPush(userApp.id, newSchema);
+              
+              Alert.alert('Success', `Table "${entityName}" deleted successfully!`);
+              
+              // Refresh user app to get updated schema
+              await refreshUserApp();
+              setShowEntityDetails(false);
+              
+            } catch (error) {
+              console.error('Error deleting entity:', error);
+              Alert.alert('Error', `Failed to delete table: ${error.message}`);
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderEntityCard = (entity: any, index: number) => (
     <TouchableOpacity
       key={index}
@@ -165,15 +367,33 @@ export default function TablesScreen() {
     </TouchableOpacity>
   );
 
-  const renderFieldRow = (field: any, index: number) => (
+  const renderFieldRow = (field: any, index: number, showActions: boolean = false) => (
     <View key={index} style={styles.fieldRow}>
-      <Text style={[styles.fieldName, { color: colors.text }]}>{field.name}</Text>
-      <View style={styles.fieldMeta}>
-        <Text style={[styles.fieldType, { color: colors.primary }]}>{field.type}</Text>
-        {field.required && (
-          <Text style={[styles.requiredBadge, { color: colors.warning }]}>Required</Text>
-        )}
+      <View style={styles.fieldInfo}>
+        <Text style={[styles.fieldName, { color: colors.text }]}>{field.name}</Text>
+        <View style={styles.fieldMeta}>
+          <Text style={[styles.fieldType, { color: colors.primary }]}>{field.type}</Text>
+          {field.required && (
+            <Text style={[styles.requiredBadge, { color: colors.warning }]}>Required</Text>
+          )}
+        </View>
       </View>
+      {showActions && (
+        <View style={styles.fieldActions}>
+          <TouchableOpacity 
+            onPress={() => startEditField(index)}
+            style={styles.fieldActionButton}
+          >
+            <Text style={[styles.fieldActionText, { color: colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => removeFieldFromEditingEntity(index)}
+            style={styles.fieldActionButton}
+          >
+            <Text style={[styles.fieldActionText, { color: '#ef4444' }]}>Remove</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -386,7 +606,9 @@ export default function TablesScreen() {
               <Text style={[styles.modalCancelText, { color: colors.primary }]}>Close</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Table Details</Text>
-            <View style={{ width: 60 }} />
+            <TouchableOpacity onPress={() => selectedEntity && editEntity(selectedEntity)}>
+              <Text style={[styles.modalSaveText, { color: colors.primary }]}>Edit</Text>
+            </TouchableOpacity>
           </View>
           
           {selectedEntity && (
@@ -396,8 +618,189 @@ export default function TablesScreen() {
               
               <Text style={[styles.detailLabel, { color: colors.text }]}>Fields ({selectedEntity.fields.length})</Text>
               {selectedEntity.fields.map((field: any, index: number) => renderFieldRow(field, index))}
+              
+              <TouchableOpacity
+                onPress={() => deleteEntity(selectedEntity.name)}
+                style={[styles.deleteButton, { backgroundColor: '#ef4444' }]}
+              >
+                <Text style={[styles.deleteButtonText, { color: 'white' }]}>
+                  Delete Table
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Edit Entity Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Table</Text>
+            <TouchableOpacity onPress={updateEntity} disabled={isLoading}>
+              <Text style={[styles.modalSaveText, { 
+                color: !isLoading ? colors.primary : colors.textSecondary 
+              }]}>
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            {editingEntity && (
+              <>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>Table Name</Text>
+                <Text style={[styles.detailValue, { color: colors.textSecondary }]}>{editingEntity.name}</Text>
+                
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Fields</Text>
+                
+                {/* Current Fields */}
+                {editingFields.map((field, index) => (
+                  <View key={index}>
+                    {editFieldIndex === index ? (
+                      // Edit field form
+                      <View style={[styles.editFieldSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.inputLabel, { color: colors.text }]}>Edit Field</Text>
+                        
+                        <TextInput
+                          style={[styles.textInput, { 
+                            backgroundColor: colors.background, 
+                            borderColor: colors.border,
+                            color: colors.text 
+                          }]}
+                          value={editingField.name}
+                          onChangeText={(text) => setEditingField(prev => ({...prev, name: text}))}
+                          placeholder="Field name..."
+                          placeholderTextColor={colors.textSecondary}
+                        />
+                        
+                        <View style={styles.fieldTypeRow}>
+                          {['string', 'number', 'boolean', 'date'].map((type) => (
+                            <TouchableOpacity
+                              key={type}
+                              style={[
+                                styles.typeButton,
+                                { 
+                                  backgroundColor: editingField.type === type ? colors.primary : colors.background,
+                                  borderColor: colors.border 
+                                }
+                              ]}
+                              onPress={() => setEditingField(prev => ({...prev, type}))}
+                            >
+                              <Text style={[
+                                styles.typeButtonText,
+                                { color: editingField.type === type ? colors.background : colors.text }
+                              ]}>
+                                {type}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        
+                        <TouchableOpacity
+                          style={[styles.requiredToggle, { borderColor: colors.border }]}
+                          onPress={() => setEditingField(prev => ({...prev, required: !prev.required}))}
+                        >
+                          <Text style={[styles.requiredText, { color: colors.text }]}>
+                            Required: {editingField.required ? 'Yes' : 'No'}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        <View style={styles.editFieldActions}>
+                          <TouchableOpacity
+                            style={[styles.editFieldButton, { backgroundColor: colors.primary }]}
+                            onPress={saveEditField}
+                            disabled={!editingField.name.trim()}
+                          >
+                            <Text style={[styles.editFieldButtonText, { color: colors.background }]}>
+                              Save
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.editFieldButton, { backgroundColor: colors.textSecondary }]}
+                            onPress={cancelEditField}
+                          >
+                            <Text style={[styles.editFieldButtonText, { color: colors.background }]}>
+                              Cancel
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      // Display field with actions
+                      renderFieldRow(field, index, true)
+                    )}
+                  </View>
+                ))}
+                
+                {/* Add New Field */}
+                <View style={[styles.addFieldSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Add New Field</Text>
+                  
+                  <TextInput
+                    style={[styles.textInput, { 
+                      backgroundColor: colors.background, 
+                      borderColor: colors.border,
+                      color: colors.text 
+                    }]}
+                    value={editingField.name}
+                    onChangeText={(text) => setEditingField(prev => ({...prev, name: text}))}
+                    placeholder="Field name..."
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  
+                  <View style={styles.fieldTypeRow}>
+                    {['string', 'number', 'boolean', 'date'].map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          styles.typeButton,
+                          { 
+                            backgroundColor: editingField.type === type ? colors.primary : colors.background,
+                            borderColor: colors.border 
+                          }
+                        ]}
+                        onPress={() => setEditingField(prev => ({...prev, type}))}
+                      >
+                        <Text style={[
+                          styles.typeButtonText,
+                          { color: editingField.type === type ? colors.background : colors.text }
+                        ]}>
+                          {type}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  <TouchableOpacity
+                    style={[styles.requiredToggle, { borderColor: colors.border }]}
+                    onPress={() => setEditingField(prev => ({...prev, required: !prev.required}))}
+                  >
+                    <Text style={[styles.requiredText, { color: colors.text }]}>
+                      Required: {editingField.required ? 'Yes' : 'No'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.addFieldButton, { backgroundColor: colors.primary }]}
+                    onPress={addFieldToEditingEntity}
+                    disabled={!editingField.name.trim()}
+                  >
+                    <Text style={[styles.addFieldButtonText, { color: colors.background }]}>
+                      Add Field
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </View>
@@ -641,5 +1044,48 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderBottomWidth: 0.5,
     borderBottomColor: '#f0f0f0',
+  },
+  fieldActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  fieldActionButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  fieldActionText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    marginTop: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  editFieldSection: {
+    padding: Spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  editFieldActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  editFieldButton: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  editFieldButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

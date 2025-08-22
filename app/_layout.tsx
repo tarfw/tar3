@@ -37,6 +37,8 @@ function AppContent() {
           <Stack.Screen name="agents" options={{ headerShown: false }} />
           <Stack.Screen name="aichat" options={{ headerShown: false }} />
           <Stack.Screen name="tables" options={{ headerShown: false }} />
+          <Stack.Screen name="posts" options={{ headerShown: false }} />
+          <Stack.Screen name="posts-settings" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
