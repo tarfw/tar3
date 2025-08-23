@@ -126,6 +126,11 @@ const MAPPING = {
   'curlybraces': 'code',
   'checkmark.square': 'check-box-outline-blank',
   'square': 'check-box-outline-blank',
+  
+  // Heading level icons
+  '1.circle': 'looks-one',
+  '2.circle': 'looks-two',
+  '3.circle': 'looks-3',
 } as IconMapping;
 
 /**
