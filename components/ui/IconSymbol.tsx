@@ -127,10 +127,10 @@ const MAPPING = {
   'checkmark.square': 'check-box-outline-blank',
   'square': 'check-box-outline-blank',
   
-  // Heading level icons
-  '1.circle': 'looks-one',
-  '2.circle': 'looks-two',
-  '3.circle': 'looks-3',
+  // Heading level icons - using distinct icons for each level
+  '1.circle': 'title',
+  '2.circle': 'text-fields',
+  '3.circle': 'short-text',
 } as IconMapping;
 
 /**

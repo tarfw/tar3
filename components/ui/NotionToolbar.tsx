@@ -1,10 +1,15 @@
 import { Colors } from '@/constants/Colors';
 import { Radius, Spacing } from '@/constants/Typography';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import React from 'react';
+import { r2Service, type MediaFile } from '@/lib/r2-service';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     ScrollView,
     StyleSheet,
+    Text,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -14,7 +19,8 @@ type BlockType = 'title' | 'heading1' | 'heading2' | 'heading3' | 'text' | 'bull
 
 interface ToolbarAction {
   id: string;
-  icon: string;
+  icon?: string;  // Made optional for text-based buttons
+  text?: string;  // Added text option
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary';
@@ -27,6 +33,7 @@ interface NotionToolbarProps {
   onTextStyle?: () => void;
   onList?: () => void;
   onImage?: () => void;
+  onImageInsert?: (imageUrl: string, imageName: string, imageKey?: string) => void; // Updated to include imageKey
   onTurnInto?: () => void;
   onUndo?: () => void;
   onComment?: () => void;
@@ -40,6 +47,7 @@ export default function NotionToolbar({
   onTextStyle,
   onList,
   onImage,
+  onImageInsert,
   onTurnInto,
   onUndo,
   onComment,
@@ -47,6 +55,53 @@ export default function NotionToolbar({
 }: NotionToolbarProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async () => {
+    // Request permission first
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant photo library permissions to upload images.');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: false,
+        quality: 0.8,
+        exif: false,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      setUploadingImage(true);
+
+      const mediaFile: MediaFile = {
+        uri: asset.uri,
+        name: asset.fileName || `image_${Date.now()}.jpg`,
+        type: asset.type === 'video' ? 'video/mp4' : 'image/jpeg',
+        size: asset.fileSize,
+      };
+
+      const uploadResult = await r2Service.uploadFile(mediaFile, 'media');
+      
+      if (uploadResult.success && uploadResult.url) {
+        // Call the callback to insert the image into the editor with the key
+        onImageInsert?.(uploadResult.url, mediaFile.name, uploadResult.key);
+      } else {
+        Alert.alert('Upload failed', uploadResult.error || 'Unknown error occurred while uploading image');
+      }
+    } catch (error) {
+      console.error('Image upload error:', error);
+      Alert.alert('Error', 'Failed to pick or upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const toolbarActions: ToolbarAction[] = [
     {
@@ -58,19 +113,19 @@ export default function NotionToolbar({
     },
     {
       id: 'h1',
-      icon: '1.circle',
+      text: 'H1',
       label: 'H1',
       onPress: () => onSelectBlockType?.('heading1'),
     },
     {
       id: 'h2',
-      icon: '2.circle',
+      text: 'H2',
       label: 'H2', 
       onPress: () => onSelectBlockType?.('heading2'),
     },
     {
       id: 'h3',
-      icon: '3.circle',
+      text: 'H3',
       label: 'H3',
       onPress: () => onSelectBlockType?.('heading3'),
     },
@@ -90,7 +145,7 @@ export default function NotionToolbar({
       id: 'image',
       icon: 'photo',
       label: 'Image',
-      onPress: onImage || (() => {}),
+      onPress: handleImageUpload,
     },
     {
       id: 'undo',
@@ -102,6 +157,7 @@ export default function NotionToolbar({
 
   const renderToolbarAction = (action: ToolbarAction) => {
     const isPrimary = action.variant === 'primary';
+    const isImageUploading = action.id === 'image' && uploadingImage;
     
     return (
       <TouchableOpacity
@@ -110,16 +166,36 @@ export default function NotionToolbar({
           styles.toolbarButton,
           {
             backgroundColor: isPrimary ? colors.primary : 'transparent',
+            opacity: isImageUploading ? 0.6 : 1,
           }
         ]}
         onPress={action.onPress}
         activeOpacity={0.6}
+        disabled={isImageUploading}
       >
-        <IconSymbol
-          size={20}
-          name={action.icon}
-          color={isPrimary ? colors.background : colors.text}
-        />
+        {isImageUploading ? (
+          <ActivityIndicator 
+            size="small" 
+            color={isPrimary ? colors.background : colors.text} 
+          />
+        ) : action.text ? (
+          <Text
+            style={[
+              styles.buttonText,
+              {
+                color: isPrimary ? colors.background : colors.text,
+              }
+            ]}
+          >
+            {action.text}
+          </Text>
+        ) : action.icon ? (
+          <IconSymbol
+            size={20}
+            name={action.icon}
+            color={isPrimary ? colors.background : colors.text}
+          />
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -161,5 +237,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     width: 40,
     height: 40,
+  },
+  buttonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
