@@ -5,13 +5,13 @@ import { r2Service, type MediaFile } from '@/lib/r2-service';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
 
@@ -28,7 +28,7 @@ interface ToolbarAction {
 
 interface NotionToolbarProps {
   onAIAssist?: () => void;
-  onAddBlock?: () => void;
+  onAddBlock?: (type?: BlockType) => void;
   onSelectBlockType?: (type: BlockType) => void;
   onTextStyle?: () => void;
   onList?: () => void;
@@ -105,46 +105,45 @@ export default function NotionToolbar({
 
   const toolbarActions: ToolbarAction[] = [
     {
-      id: 'ai',
-      icon: 'sparkles',
-      label: 'AI',
-      onPress: onAIAssist || (() => {}),
-      variant: 'primary',
+      id: 'text',
+      text: 'Text',
+      label: 'Add Text Block',
+      onPress: () => onAddBlock?.('text'),
     },
     {
       id: 'h1',
       text: 'H1',
-      label: 'H1',
-      onPress: () => onSelectBlockType?.('heading1'),
+      label: 'Add H1',
+      onPress: () => onAddBlock?.('heading1'),
     },
     {
       id: 'h2',
       text: 'H2',
-      label: 'H2', 
-      onPress: () => onSelectBlockType?.('heading2'),
+      label: 'Add H2', 
+      onPress: () => onAddBlock?.('heading2'),
     },
     {
       id: 'h3',
       text: 'H3',
-      label: 'H3',
-      onPress: () => onSelectBlockType?.('heading3'),
+      label: 'Add H3',
+      onPress: () => onAddBlock?.('heading3'),
     },
     {
       id: 'bullet',
       icon: 'list.bullet',
-      label: 'Bullet',
-      onPress: () => onSelectBlockType?.('bullet'),
+      label: 'Add Bullet List',
+      onPress: () => onAddBlock?.('bullet'),
     },
     {
       id: 'todo',
       icon: 'checkmark.square',
-      label: 'Todo',
-      onPress: () => onSelectBlockType?.('task'),
+      label: 'Add Todo',
+      onPress: () => onAddBlock?.('task'),
     },
     {
       id: 'image',
       icon: 'photo',
-      label: 'Image',
+      label: 'Add Image',
       onPress: handleImageUpload,
     },
     {

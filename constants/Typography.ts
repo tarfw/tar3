@@ -38,10 +38,10 @@ export const Typography = {
 
   // Font weights
   fontWeight: {
-    regular: '400',
-    medium: '500',
-    semibold: '600',
-    bold: '700',
+    regular: '400' as const,
+    medium: '500' as const,
+    semibold: '600' as const,
+    bold: '700' as const,
   },
 
   // Letter spacing

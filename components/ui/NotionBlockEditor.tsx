@@ -72,7 +72,7 @@ export default React.forwardRef<NotionBlockEditorMethods, NotionBlockEditorProps
   const [blocks, setBlocks] = useState<Block[]>(
     initialBlocks.length > 0 
       ? initialBlocks 
-      : [{ id: generateId(), type: 'title', content: '' }]
+      : [{ id: generateId(), type: 'text', content: '' }]
   );
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [renderKey, setRenderKey] = useState(0);
