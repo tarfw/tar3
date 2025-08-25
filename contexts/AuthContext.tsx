@@ -1,18 +1,35 @@
 import LoadingScreen from '@/components/LoadingScreen';
 import { db, id } from '@/lib/instant';
-import { useRouter, useSegments } from 'expo-router';
-import React, { createContext, useContext, useEffect, useState } from 'react';
 import { instantPlatformService, InstantPlatformService } from '@/lib/instantPlatformService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter, useSegments } from 'expo-router';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+
+// App initialization state machine
+type AppInitState = 
+  | 'idle'
+  | 'loading-cache'
+  | 'loading-fresh'
+  | 'creating-app'
+  | 'ready'
+  | 'error';
+
+type AppInitError = {
+  code: string;
+  message: string;
+  retryable: boolean;
+};
 
 type AuthContextType = {
   user: any;
-  userApp: any;
+  userApp: any | null;
   isLoading: boolean;
-  isAppLoading: boolean;
+  appInitState: AppInitState;
+  appInitError: AppInitError | null;
   error: any;
   signOut: () => Promise<void>;
   refreshUserApp: () => Promise<void>;
+  retryAppInit: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -29,205 +46,174 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isLoading: authLoading, user, error } = db.useAuth();
   const router = useRouter();
   const segments = useSegments();
-  const [userApp, setUserApp] = useState(null);
-  const [isAppLoading, setIsAppLoading] = useState(false);
-  const [appCacheChecked, setAppCacheChecked] = useState(false);
+  const [userApp, setUserApp] = useState<any | null>(null);
+  const [appInitState, setAppInitState] = useState<AppInitState>('idle');
+  const [appInitError, setAppInitError] = useState<AppInitError | null>(null);
+  const initializationRef = useRef<{ userId?: string; promise?: Promise<void> }>({});
 
   // Cache keys
   const getUserAppCacheKey = (userId: string) => `user_app_${userId}`;
   const getUserAppIdCacheKey = (userId: string) => `user_app_id_${userId}`;
   const getUserAppCreatedFlagKey = (userId: string) => `user_app_created_${userId}`;
 
-  // Load cached app data first, then check for updates if needed
+  // Single effect for app initialization - simplified and optimistic
   useEffect(() => {
-    if (user?.id && !appCacheChecked) {
-      loadCachedAppData();
+    if (user?.id && appInitState === 'idle') {
+      initializeUserApp(user.id);
     } else if (!user?.id) {
-      // Reset cache check when user logs out
-      setAppCacheChecked(false);
+      // Reset state when user logs out
+      resetAppState();
     }
-  }, [user?.id]);
+  }, [user?.id, appInitState]);
 
-  // Timeout mechanism to prevent infinite loading
-  useEffect(() => {
-    if (user?.id && !appCacheChecked) {
-      const timeout = setTimeout(() => {
-        console.log('Cache check timeout - proceeding without cache');
-        setAppCacheChecked(true);
-        setIsAppLoading(false);
-      }, 5000); // 5 second timeout
-
-      return () => clearTimeout(timeout);
-    }
-  }, [user?.id, appCacheChecked]);
-
-  // Fallback timeout for app creation - ensures new users get apps
-  useEffect(() => {
-    if (user?.id && appCacheChecked && !userApp && !isAppLoading) {
-      const appCreationTimeout = setTimeout(() => {
-        console.log('App creation fallback timeout - forcing app creation for user:', user.id);
-        handleFreshUserData();
-      }, 3000); // 3 second timeout after cache check
-
-      return () => clearTimeout(appCreationTimeout);
-    }
-  }, [user?.id, appCacheChecked, userApp, isAppLoading]);
-
-  // Always call useQuery hook, but conditionally enable it
-  const shouldQueryDB = user?.id && appCacheChecked && !userApp && !isAppLoading;
-  const { data: userData, isLoading: userDataLoading, error: userDataError } = db.useQuery(
-    shouldQueryDB ? {
-      app: {
-        $users: { $: { where: { id: user.id } } }
-      }
-    } : null
-  );
-
-  // Handle fresh data from foundation DB or trigger app creation for new users
-  useEffect(() => {
-    console.log('App creation effect triggered:', {
-      hasUser: !!user,
-      userDataLoading,
-      userDataError: !!userDataError,
-      appCacheChecked,
-      hasUserApp: !!userApp,
-      isAppLoading,
-      shouldTrigger: user && !userDataLoading && appCacheChecked && !userApp && !isAppLoading
-    });
-
-    // Trigger app creation even if there's a userDataError (permission issues)
-    // This ensures new users get apps even if foundation DB queries fail
-    if (user && !userDataLoading && appCacheChecked && !userApp && !isAppLoading) {
-      // For new users, userData might be empty object or have empty app array
-      console.log('Checking user data for app creation:', { 
-        hasUserData: !!userData, 
-        appCount: userData?.app?.length || 0,
-        userId: user.id,
-        hasError: !!userDataError
-      });
-      handleFreshUserData();
-    }
-  }, [user, userData, userDataLoading, userDataError, appCacheChecked, isAppLoading]);
-
+  // Navigation effect - simplified
   useEffect(() => {
     if (authLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!user && !inAuthGroup) {
-      // Redirect to sign-in if not authenticated and not in auth group
       router.replace('/sign-in');
     } else if (user && inAuthGroup) {
-      // Redirect to main app if authenticated and in auth group
       router.replace('/(tabs)');
     }
   }, [user, authLoading, segments]);
 
-  const loadCachedAppData = async () => {
-    if (!user?.id || appCacheChecked) return;
-
-    try {
-      setIsAppLoading(true);
-      
-      // Try to load from cache first
-      const cachedApp = await AsyncStorage.getItem(getUserAppCacheKey(user.id));
-      const cachedAppId = await AsyncStorage.getItem(getUserAppIdCacheKey(user.id));
-      const appCreatedFlag = await AsyncStorage.getItem(getUserAppCreatedFlagKey(user.id));
-      
-      console.log('Cache check results:', {
-        hasCachedApp: !!cachedApp,
-        hasCachedAppId: !!cachedAppId,
-        hasAppCreatedFlag: !!appCreatedFlag,
-        userId: user.id
-      });
-      
-      if (cachedApp && cachedAppId) {
-        try {
-          // Use cached data immediately for smooth UX
-          const appData = JSON.parse(cachedApp);
-          setUserApp(appData);
-          console.log('Loaded app from cache for user:', user.id);
-        } catch (parseError) {
-          console.error('Error parsing cached app data:', parseError);
-          // Clear corrupted cache
-          await AsyncStorage.removeItem(getUserAppCacheKey(user.id));
-          await AsyncStorage.removeItem(getUserAppIdCacheKey(user.id));
-          await AsyncStorage.removeItem(getUserAppCreatedFlagKey(user.id));
-        }
-      }
-      
-    } catch (error) {
-      console.error('Error loading cached app data:', error);
-    } finally {
-      setAppCacheChecked(true);
-      setIsAppLoading(false);
+  // Optimized initialization with state machine
+  const initializeUserApp = useCallback(async (userId: string) => {
+    // Prevent duplicate initialization for same user
+    if (initializationRef.current.userId === userId && initializationRef.current.promise) {
+      return initializationRef.current.promise;
     }
-  };
 
-  const handleFreshUserData = async () => {
-    if (!user || isAppLoading) return;
-
-    // Add a small delay to prevent race conditions
-    await new Promise(resolve => setTimeout(resolve, 100));
-
+    const initPromise = performAppInitialization(userId);
+    initializationRef.current = { userId, promise: initPromise };
+    
     try {
-      setIsAppLoading(true);
+      await initPromise;
+    } finally {
+      initializationRef.current = {};
+    }
+  }, []);
+
+  const performAppInitialization = async (userId: string) => {
+    try {
+      setAppInitState('loading-cache');
+      setAppInitError(null);
       
-      // Check if user already has an app creation flag (prevents duplicate creation)
-      const appCreatedFlag = await AsyncStorage.getItem(getUserAppCreatedFlagKey(user.id));
-      
-      if (appCreatedFlag) {
-        console.log('User already has app creation flag - checking if app still exists');
-        const cachedAppId = await AsyncStorage.getItem(getUserAppIdCacheKey(user.id));
-        if (cachedAppId) {
-          // Try to load the existing app
-          await loadExistingApp(cachedAppId, true);
-          return; // Exit early - user already has an app
-        }
+      // Step 1: Load from cache optimistically (immediate UI feedback)
+      const cachedData = await loadFromCache(userId);
+      if (cachedData) {
+        setUserApp(cachedData);
+        console.log('✓ Loaded app from cache');
       }
       
-      // Check if user already has an app in foundation DB
-      // userData might be undefined for new users or have empty app array
-      const existingApp = userData?.app?.find(app => 
-        app.$users?.some(u => u.id === user.id)
-      );
-
-      console.log('App check result:', { 
-        existingApp: !!existingApp, 
-        appId: existingApp?.appid,
-        userDataExists: !!userData,
-        appArrayLength: userData?.app?.length || 0,
-        userDataError: !!userDataError,
-        hasAppCreatedFlag: !!appCreatedFlag
-      });
-
-      if (existingApp?.appid) {
-        // User already has app - load and cache it
-        console.log('Loading existing app for user:', user.id);
-        await loadExistingApp(existingApp.appid, true);
-      } else if (!appCreatedFlag) {
-        // New user and no creation flag - auto-create app (ONE-TIME CREATION)
-        console.log('Creating new app for first-time user:', user.id);
-        await createDefaultApp();
+      // Step 2: Fetch fresh data in background and update if different
+      setAppInitState('loading-fresh');
+      const freshData = await loadFromDatabase(userId);
+      
+      if (freshData) {
+        // Update if we have fresh data
+        if (!cachedData || (freshData.updatedAt && (!cachedData.updatedAt || freshData.updatedAt > cachedData.updatedAt))) {
+          setUserApp(freshData);
+          await cacheAppData(userId, freshData);
+          console.log('✓ Updated with fresh data');
+        }
+        setAppInitState('ready');
       } else {
-        console.log('User has creation flag but no app found - may need manual intervention');
-      }
-    } catch (error) {
-      console.error('Error handling fresh user data:', error);
-      // For new users, still try to create an app even if there are errors
-      const appCreatedFlag = await AsyncStorage.getItem(getUserAppCreatedFlagKey(user.id));
-      if (!userApp && !appCreatedFlag) {
-        console.log('Fallback: Attempting app creation despite errors');
-        try {
-          await createDefaultApp();
-        } catch (fallbackError) {
-          console.error('Fallback app creation also failed:', fallbackError);
+        // No existing app - create new one
+        if (!cachedData) {
+          await createNewApp(userId);
+        } else {
+          setAppInitState('ready');
         }
       }
-    } finally {
-      setIsAppLoading(false);
+    } catch (error: any) {
+      console.error('App initialization error:', error);
+      setAppInitError({
+        code: error?.code || 'INIT_ERROR',
+        message: error?.message || 'Failed to initialize app',
+        retryable: true
+      });
+      setAppInitState('error');
     }
   };
+
+  const loadFromCache = async (userId: string) => {
+    try {
+      const cachedApp = await AsyncStorage.getItem(getUserAppCacheKey(userId));
+      if (cachedApp) {
+        return JSON.parse(cachedApp);
+      }
+    } catch (error) {
+      console.warn('Cache load failed:', error);
+      // Clear corrupted cache
+      await clearUserAppCache(userId);
+    }
+    return null;
+  };
+
+  const loadFromDatabase = async (userId: string) => {
+    try {
+      // Query foundation DB for existing app
+      const { data } = await db.queryOnce({
+        app: {
+          $users: { $: { where: { id: userId } } }
+        }
+      });
+      
+      const existingApp = data?.app?.find(app => 
+        app.$users?.some(u => u.id === userId)
+      );
+      
+      if (existingApp?.appid) {
+        return await loadExistingApp(existingApp.appid, false);
+      }
+    } catch (error) {
+      console.warn('Database query failed:', error);
+    }
+    return null;
+  };
+
+  const createNewApp = async (userId: string) => {
+    setAppInitState('creating-app');
+    
+    // Check if we already have a creation flag
+    const appCreatedFlag = await AsyncStorage.getItem(getUserAppCreatedFlagKey(userId));
+    if (appCreatedFlag) {
+      console.log('App creation already attempted for user');
+      setAppInitState('ready');
+      return;
+    }
+    
+    console.log('Creating new app for user:', userId);
+    await createDefaultApp();
+    setAppInitState('ready');
+  };
+
+  const cacheAppData = async (userId: string, appData: any) => {
+    try {
+      await AsyncStorage.setItem(getUserAppCacheKey(userId), JSON.stringify(appData));
+      await AsyncStorage.setItem(getUserAppIdCacheKey(userId), appData.id);
+    } catch (error) {
+      console.warn('Failed to cache app data:', error);
+    }
+  };
+
+  const resetAppState = () => {
+    setUserApp(null);
+    setAppInitState('idle');
+    setAppInitError(null);
+    initializationRef.current = {};
+  };
+
+  // Retry mechanism for failed initialization
+  const retryAppInit = useCallback(async () => {
+    if (user?.id) {
+      setAppInitState('idle');
+      await initializeUserApp(user.id);
+    }
+  }, [user?.id, initializeUserApp]);
 
   const loadExistingApp = async (appId: string, shouldCache: boolean = false) => {
     try {
@@ -244,21 +230,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const foundApp = apps.find(app => app.id === appId);
       
       if (foundApp) {
-        setUserApp(foundApp);
-        
         // Cache the app data if requested
         if (shouldCache && user?.id) {
-          await AsyncStorage.setItem(getUserAppCacheKey(user.id), JSON.stringify(foundApp));
-          await AsyncStorage.setItem(getUserAppIdCacheKey(user.id), appId);
-          console.log('Cached app data for user:', user.id);
+          await cacheAppData(user.id, foundApp);
         }
-      } else {
-        setUserApp(null);
+        return foundApp;
       }
     } catch (error) {
       console.error('Error loading existing app:', error);
-      setUserApp(null);
+      throw error;
     }
+    return null;
   };
 
   const createDefaultApp = async () => {
@@ -268,58 +250,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Initialize platform service
       const platformToken = process.env.EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN;
       if (!platformToken) {
-        console.error('EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN not set');
-        return;
+        throw new Error('EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN not set');
       }
 
       if (!instantPlatformService.isInitialized()) {
         await instantPlatformService.saveToken(platformToken);
       }
 
-      // Create app with default template (ONE-TIME CREATION)
+      // Create app with default template
       const newApp = await instantPlatformService.createApp({
         title: user.email?.split('@')[0] || 'User',
         schema: InstantPlatformService.createBasicTodoSchema(),
         perms: InstantPlatformService.createBasicTodoPermissions(),
       });
 
-      // Link to user in foundation DB (ONE-TIME LINK)
+      // Link to user in foundation DB
       try {
         await db.transact([
           db.tx.app[id()].update({
             appid: newApp.id
           }).link({ $users: user.id })
         ]);
-        console.log('Successfully linked app to user in foundation DB');
       } catch (linkError) {
-        console.error('Error linking app to user in foundation DB:', linkError);
-        // Continue anyway - the app was created successfully
-        // User can still access it, just won't be linked in foundation DB
-        console.log('App created but not linked - user can still access it');
+        console.warn('Failed to link app to foundation DB:', linkError);
+        // Continue - app was created successfully
       }
 
       setUserApp(newApp);
       
       // Cache the newly created app and set creation flag
       if (user?.id) {
-        await AsyncStorage.setItem(getUserAppCacheKey(user.id), JSON.stringify(newApp));
-        await AsyncStorage.setItem(getUserAppIdCacheKey(user.id), newApp.id);
+        await cacheAppData(user.id, newApp);
         await AsyncStorage.setItem(getUserAppCreatedFlagKey(user.id), 'true');
-        console.log('Cached newly created app and set creation flag for user:', user.id);
       }
       
-      console.log('Successfully created app for new user:', newApp.id);
+      console.log('✓ Created new app for user');
     } catch (error) {
       console.error('Error creating default app:', error);
-      // Don't throw - let user continue, they can create manually later
+      throw error;
     }
   };
 
-  const refreshUserApp = async () => {
+  const refreshUserApp = useCallback(async () => {
     if (user?.id && userApp?.id) {
-      await loadExistingApp(userApp.id, true);
+      const refreshedApp = await loadExistingApp(userApp.id, true);
+      if (refreshedApp) {
+        setUserApp(refreshedApp);
+      }
     }
-  };
+  }, [user?.id, userApp?.id]);
 
   const clearUserAppCache = async (userId?: string) => {
     const targetUserId = userId || user?.id;
@@ -335,12 +314,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       // Clear app state first
-      setUserApp(null);
-      setIsAppLoading(false);
-      setAppCacheChecked(false);
+      resetAppState();
       
       // Clear app cache
       await clearUserAppCache();
@@ -358,13 +335,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Still navigate even if there's an error
       router.replace('/sign-in');
     }
-  };
-
-  const isLoading = authLoading;
+  }, []);
 
   // Show loading screen only while checking auth state
-  // Don't block on app loading for better UX
-  if (isLoading) {
+  if (authLoading) {
     return <LoadingScreen />;
   }
 
@@ -372,11 +346,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ 
       user, 
       userApp,
-      isLoading, 
-      isAppLoading,
+      isLoading: authLoading,
+      appInitState,
+      appInitError,
       error, 
       signOut,
-      refreshUserApp
+      refreshUserApp,
+      retryAppInit
     }}>
       {children}
     </AuthContext.Provider>

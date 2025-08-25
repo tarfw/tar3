@@ -131,6 +131,9 @@ const MAPPING = {
   '1.circle': 'title',
   '2.circle': 'text-fields',
   '3.circle': 'short-text',
+  
+  // Export and sharing icons
+  'rectangle.portrait.and.arrow.right': 'share',
 } as IconMapping;
 
 /**
