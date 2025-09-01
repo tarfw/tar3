@@ -14,10 +14,19 @@ import { Comment, Issue } from '../lib/instant';
 // Turso DB Configuration
 export const TURSO_DB_NAME = 'tar.db';
 
-export const tursoOptions = {
+// Dynamic turso options that will be set per user
+export let tursoOptions = {
   url: process.env.EXPO_PUBLIC_TURSO_DB_URL,
   authToken: process.env.EXPO_PUBLIC_TURSO_DB_AUTH_TOKEN,
 } as const;
+
+// Function to update turso options for a specific user
+export const updateUserTursoOptions = (url: string, authToken: string) => {
+  tursoOptions = {
+    url,
+    authToken,
+  };
+};
 
 // Local SQLite issue structure (for Turso local-first)
 export interface LocalIssue {

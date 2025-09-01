@@ -32,6 +32,38 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Database Architecture
+
+This app uses a hybrid database approach:
+
+1. **InstantDB** - Used for real-time collaboration features and user authentication
+2. **Turso (SQLite)** - Used for local-first data storage with automatic synchronization
+
+### Database Creation
+
+For each new user, the app automatically creates:
+- A dedicated InstantDB database for real-time features
+- A dedicated Turso SQLite database for local-first storage
+- Database configuration stored in InstantDB for persistence across devices
+
+The Turso integration provides:
+- Offline-first capability with local SQLite storage
+- Automatic synchronization with the cloud when online
+- Per-user isolated databases for data privacy
+- Database configuration stored in InstantDB for persistence across devices
+
+### Simplified Authentication Flow
+
+The authentication process is straightforward:
+1. User authenticates with InstantDB (magic code flow)
+2. System checks if user already has an app
+3. If not, creates InstantDB app and Turso database
+4. Links user to their databases
+5. Configures HybridDbContext for user-specific data
+6. Navigates to main app
+
+No caching is used since authentication already requires network connectivity.
+
 ## Get a fresh project
 
 When you're ready, run:
