@@ -16,6 +16,7 @@ interface TursoDatabase {
   createdAt: string;
   suspended: boolean;
   version: string;
+  authToken?: string;
 }
 
 export class TursoService {
@@ -30,21 +31,17 @@ export class TursoService {
   // Create a new database for a user
   async createUserDatabase(userId: string, userEmail?: string): Promise<TursoDatabase> {
     try {
-      // Generate a database name based on user's email (without symbols) and full user ID for uniqueness
+      // Generate a database name based on user's email (without symbols) and a short unique identifier
       let dbName = 'user-db';
       if (userEmail) {
         // Remove symbols and use email prefix
         const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        // Ensure minimum length and add full user ID to ensure uniqueness
-        if (emailPrefix.length < 3) {
-          dbName = `user${userId.replace(/-/g, '')}`;
-        } else {
-          // Limit length and ensure uniqueness with full user ID
-          dbName = emailPrefix.substring(0, 15) + '-' + userId.replace(/-/g, '');
-        }
+        // Use email prefix (max 15 chars) and last 4 chars of userId for uniqueness
+        const shortUserId = userId.replace(/-/g, '').slice(-4);
+        dbName = `${emailPrefix.substring(0, 15)}-${shortUserId}`;
       } else {
-        // Fallback to user ID based naming
-        dbName = `user-${userId.replace(/-/g, '')}`;
+        // Fallback to user ID based naming with last 8 chars
+        dbName = `user-${userId.replace(/-/g, '').slice(-8)}`;
       }
       
       console.log(`Attempting to create Turso database with name: ${dbName}`);
@@ -90,29 +87,30 @@ export class TursoService {
           
           // If we can't find it in InstantDB, we need to handle this case
           console.warn(`Database exists but no info found in InstantDB for user ${userId}`);
-          // Generate the expected database name and create a minimal info object
+          // Generate the expected database name with the new naming convention
           let dbName = 'user-db';
           if (userEmail) {
             const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-            if (emailPrefix.length < 3) {
-              dbName = `user${userId.replace(/-/g, '')}`;
-            } else {
-              dbName = emailPrefix.substring(0, 15) + '-' + userId.replace(/-/g, '');
-            }
+            const shortUserId = userId.replace(/-/g, '').slice(-4);
+            dbName = `${emailPrefix.substring(0, 15)}-${shortUserId}`;
           } else {
-            dbName = `user-${userId.replace(/-/g, '')}`;
+            dbName = `user-${userId.replace(/-/g, '').slice(-8)}`;
           }
+          
+          // Generate a minimal auth token
+          const authToken = await this.getDatabaseAuthToken(dbName);
           
           // Create a minimal database info object
           const database: TursoDatabase = {
             id: '', // Not available without another API call
             name: dbName,
-            hostname: `${dbName}-tarfw.turso.io`,
+            hostname: `${dbName}-${this.orgName}.turso.io`,
             region: 'default',
             primaryRegion: 'default',
             createdAt: new Date().toISOString(),
             suspended: false,
-            version: 'latest'
+            version: 'latest',
+            authToken: authToken
           };
           
           // Try to save this info to InstantDB
@@ -137,14 +135,18 @@ export class TursoService {
         id: result.database.DbId,
         name: result.database.Name,
         hostname: result.database.Hostname,
-        region: 'default', // Will be updated when saved to InstantDB
+        region: 'default', // Will be generated when needed
         primaryRegion: 'default',
         createdAt: new Date().toISOString(),
         suspended: false,
         version: 'latest'
       };
       
-      // Store database info in InstantDB for the user
+      // Generate and store auth token for the database
+      const authToken = await this.getDatabaseAuthToken(database.name);
+      database.authToken = authToken;
+      
+      // Store database info including auth token in InstantDB for the user
       await this.saveUserDatabaseInfoToInstantDB(userId, database);
 
       console.log(`✓ Created Turso database for user ${userId}: ${database.name}`);
@@ -176,22 +178,21 @@ export class TursoService {
       console.log(`User app found for retrieval: ${!!userApp}`, {
         appId: userApp?.id,
         hasTursoDbName: !!userApp?.tursoDbName,
-        tursoDbName: userApp?.tursoDbName,
-        hasTursoDbHostname: !!userApp?.tursoDbHostname,
-        tursoDbHostname: userApp?.tursoDbHostname
+        tursoDbName: userApp?.tursoDbName
       });
       
       // Check if Turso DB info exists
-      if (userApp?.tursoDbName && userApp?.tursoDbHostname) {
+      if (userApp?.tursoDbName) {
         return {
           id: '', // Not stored in InstantDB, but not needed for URL generation
           name: userApp.tursoDbName,
-          hostname: userApp.tursoDbHostname,
-          region: userApp.tursoDbRegion || 'ams',
-          primaryRegion: userApp.tursoDbRegion || 'ams',
-          createdAt: userApp.tursoDbCreatedAt || new Date().toISOString(),
+          hostname: `${userApp.tursoDbName}-${this.orgName}.turso.io`,
+          region: 'default',
+          primaryRegion: 'default',
+          createdAt: new Date().toISOString(),
           suspended: false,
-          version: 'latest'
+          version: 'latest',
+          authToken: userApp.tursoDbAuthToken,
         };
       }
       
@@ -233,9 +234,7 @@ export class TursoService {
         await db.transact([
           db.tx.app[userApp.id].update({
             tursoDbName: database.name,
-            tursoDbHostname: database.hostname,
-            tursoDbRegion: database.region,
-            tursoDbCreatedAt: database.createdAt,
+            tursoDbAuthToken: database.authToken,
           })
         ] as any);
         
@@ -288,10 +287,10 @@ export class TursoService {
   }
 
   // Create database URL with auth token
-  async getDatabaseUrl(dbName: string): Promise<{ url: string; authToken: string }> {
+  async getDatabaseUrl(dbName: string, storedAuthToken?: string): Promise<{ url: string; authToken: string }> {
     try {
-      // Get auth token
-      const authToken = await this.getDatabaseAuthToken(dbName);
+      // Use stored auth token if available, otherwise generate a new one
+      const authToken = storedAuthToken || await this.getDatabaseAuthToken(dbName);
       
       // Construct database URL
       const url = `libsql://${dbName}-${this.orgName}.turso.io`;

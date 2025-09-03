@@ -14,9 +14,7 @@ const _schema = i.schema({
     app: i.entity({
       appid: i.string().optional(),
       tursoDbName: i.string().optional(),
-      tursoDbHostname: i.string().optional(),
-      tursoDbRegion: i.string().optional(),
-      tursoDbCreatedAt: i.string().optional(),
+      tursoDbAuthToken: i.string().optional(),
     }),
   },
   links: {

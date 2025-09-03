@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsLoading(true);
-    const initPromise = performAppInitialization(userId);
+    const initPromise = performAppInitialization(userId, user?.email);
     initializationRef.current = { userId, promise: initPromise };
     
     try {
@@ -76,11 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       initializationRef.current = {};
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.email]);
 
-  const performAppInitialization = async (userId: string) => {
+  const performAppInitialization = async (userId: string, userEmail?: string) => {
     try {
-      console.log(`Initializing app for user ${userId}`);
+      console.log(`Initializing app for user ${userId} with email: ${userEmail}`);
       
       // Check if user already has an app
       const existingApp = await findUserApp(userId);
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log(`No existing app found for user ${userId}, creating new app`);
         // Create new app for user
-        await createNewAppForUser(userId);
+        await createNewAppForUser(userId, userEmail);
       }
     } catch (error) {
       console.error('App initialization error:', error);
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const dbInfo = await tursoService.getUserDatabaseInfoFromInstantDB(userId);
       
       if (dbInfo) {
-        const { url, authToken } = await tursoService.getDatabaseUrl(dbInfo.name);
+        const { url, authToken } = await tursoService.getDatabaseUrl(dbInfo.name, dbInfo.authToken);
         updateUserTursoOptions(url, authToken);
         console.log('✓ Loaded user-specific Turso database');
       } else {
@@ -158,8 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const createNewAppForUser = async (userId: string) => {
+  const createNewAppForUser = async (userId: string, userEmail?: string) => {
     try {
+      console.log(`Creating new app for user ${userId} with email: ${userEmail}`);
+      
       // Initialize platform service
       const platformToken = process.env.EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN;
       if (!platformToken) {
@@ -171,9 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Create app with default template
-      console.log(`Creating InstantDB app for user ${userId} (${user?.email})`);
+      console.log(`Creating InstantDB app for user ${userId} (${userEmail})`);
       const newApp = await instantPlatformService.createApp({
-        title: user?.email?.split('@')[0] || 'User',
+        title: userEmail?.split('@')[0] || 'User',
         schema: InstantPlatformService.createBasicTodoSchema(),
         perms: InstantPlatformService.createBasicTodoPermissions(),
       });
@@ -199,8 +201,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log(`Checking if Turso database exists for user ${userId}`);
         const { tursoService } = await import('@/lib/tursoService');
         if (!(await tursoService.userDatabaseExists(userId))) {
-          console.log(`Creating Turso database for user ${userId}`);
-          tursoDbInfo = await tursoService.createUserDatabase(userId, user?.email);
+          console.log(`Creating Turso database for user ${userId} with email: ${userEmail}`);
+          tursoDbInfo = await tursoService.createUserDatabase(userId, userEmail);
           console.log('✓ Created Turso database for user');
         } else {
           console.log(`Retrieving existing Turso database info for user ${userId}`);
