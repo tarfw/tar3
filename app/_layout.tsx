@@ -14,7 +14,8 @@ import { SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/contexts/AuthContext';
-import { HybridDbProvider, TURSO_DB_NAME } from '@/contexts/HybridDbContext';
+import { HybridDbProvider } from '@/contexts/HybridDbContext';
+import { TURSO_DB_NAME } from '@/contexts/TursoConfig';
 import { ThemeProvider, useColorScheme } from '@/contexts/ThemeContext';
 import { TursoProvider, useTurso } from '@/contexts/TursoContext';
 import { runMigrations } from '@/lib/migrations';

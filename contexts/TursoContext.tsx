@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { tursoOptions } from './HybridDbContext';
+import { tursoOptions } from './TursoConfig';
 
 interface TursoContextType {
   isTursoConfigured: boolean;

@@ -11,23 +11,7 @@ import {
 import { DataService } from '../lib/dataService';
 import { Comment, Issue } from '../lib/instant';
 import { useTurso } from './TursoContext';
-
-// Turso DB Configuration
-export const TURSO_DB_NAME = 'tar.db';
-
-// Dynamic turso options that will be set per user
-export let tursoOptions = {
-  url: undefined as string | undefined,
-  authToken: undefined as string | undefined,
-} as const;
-
-// Function to update turso options for a specific user
-export const updateUserTursoOptions = (url: string, authToken: string) => {
-  tursoOptions = {
-    url,
-    authToken,
-  };
-};
+import { tursoOptions, updateUserTursoOptions, TURSO_DB_NAME } from './TursoConfig';
 
 // Local SQLite issue structure (for Turso local-first)
 export interface LocalIssue {
