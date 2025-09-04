@@ -10,14 +10,15 @@ import {
 } from 'react';
 import { DataService } from '../lib/dataService';
 import { Comment, Issue } from '../lib/instant';
+import { useTurso } from './TursoContext';
 
 // Turso DB Configuration
 export const TURSO_DB_NAME = 'tar.db';
 
 // Dynamic turso options that will be set per user
 export let tursoOptions = {
-  url: process.env.EXPO_PUBLIC_TURSO_DB_URL,
-  authToken: process.env.EXPO_PUBLIC_TURSO_DB_AUTH_TOKEN,
+  url: undefined as string | undefined,
+  authToken: undefined as string | undefined,
 } as const;
 
 // Function to update turso options for a specific user
@@ -170,8 +171,11 @@ interface HybridDbProviderProps {
 }
 
 export function HybridDbProvider({ children, enableTurso = true }: HybridDbProviderProps) {
+  // Use Turso context to get configuration status
+  const { isTursoConfigured } = useTurso();
+  
   // SQLite context (only if Turso is enabled and configured)
-  const sqliteDb = enableTurso && tursoOptions.url && tursoOptions.authToken ? useSQLiteContext() : null;
+  const sqliteDb = enableTurso && isTursoConfigured ? useSQLiteContext() : null;
   
   // Local state
   const [localIssues, setLocalIssues] = useState<LocalIssue[]>([]);
@@ -281,7 +285,10 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
 
   // Sync with Turso cloud
   const syncWithTurso = useCallback(async () => {
-    if (!sqliteDb) return;
+    if (!sqliteDb) {
+      console.log('No SQLite database available for sync');
+      return;
+    }
     
     console.log('Syncing with Turso...');
     setIsSyncing(true);

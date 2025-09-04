@@ -14,8 +14,9 @@ import { SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/contexts/AuthContext';
-import { HybridDbProvider, TURSO_DB_NAME, tursoOptions } from '@/contexts/HybridDbContext';
+import { HybridDbProvider, TURSO_DB_NAME } from '@/contexts/HybridDbContext';
 import { ThemeProvider, useColorScheme } from '@/contexts/ThemeContext';
+import { TursoProvider, useTurso } from '@/contexts/TursoContext';
 import { runMigrations } from '@/lib/migrations';
 
 function AppContent() {
@@ -46,6 +47,37 @@ function AppContent() {
   );
 }
 
+function AppWithTurso() {
+  const { isTursoConfigured, tursoUrl, tursoAuthToken } = useTurso();
+  
+  console.log('Turso configuration status:', {
+    isTursoConfigured,
+    tursoUrl: tursoUrl ? '[REDACTED]' : null,
+    tursoAuthToken: tursoAuthToken ? '[REDACTED]' : null
+  });
+
+  return isTursoConfigured && tursoUrl && tursoAuthToken ? (
+    <SQLiteProvider
+      databaseName={TURSO_DB_NAME}
+      options={{
+        libSQLOptions: {
+          url: tursoUrl,
+          authToken: tursoAuthToken,
+        },
+      }}
+      onInit={(db: SQLiteDatabase) => runMigrations(db)}
+    >
+      <HybridDbProvider enableTurso={true}>
+        <AppContent />
+      </HybridDbProvider>
+    </SQLiteProvider>
+  ) : (
+    <HybridDbProvider enableTurso={false}>
+      <AppContent />
+    </HybridDbProvider>
+  );
+}
+
 export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -56,31 +88,11 @@ export default function RootLayout() {
     return null;
   }
 
-  // Check if Turso is configured
-  const isTursoConfigured = Boolean(tursoOptions.url && tursoOptions.authToken);
-
   return (
-    <ThemeProvider>
-      {isTursoConfigured ? (
-        <SQLiteProvider
-          databaseName={TURSO_DB_NAME}
-          options={{
-            libSQLOptions: {
-              url: tursoOptions.url!,
-              authToken: tursoOptions.authToken!,
-            },
-          }}
-          onInit={(db: SQLiteDatabase) => runMigrations(db)}
-        >
-          <HybridDbProvider enableTurso={true}>
-            <AppContent />
-          </HybridDbProvider>
-        </SQLiteProvider>
-      ) : (
-        <HybridDbProvider enableTurso={false}>
-          <AppContent />
-        </HybridDbProvider>
-      )}
-    </ThemeProvider>
+    <TursoProvider>
+      <ThemeProvider>
+        <AppWithTurso />
+      </ThemeProvider>
+    </TursoProvider>
   );
 }

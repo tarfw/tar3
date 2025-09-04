@@ -142,16 +142,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserTursoDatabase = async (userId: string) => {
     try {
-      const { tursoService } = await import('@/lib/tursoService');
       const { updateUserTursoOptions } = await import('@/contexts/HybridDbContext');
-      const dbInfo = await tursoService.getUserDatabaseInfoFromInstantDB(userId);
       
-      if (dbInfo) {
-        const { url, authToken } = await tursoService.getDatabaseUrl(dbInfo.name, dbInfo.authToken);
+      // Get user's app entity which contains Turso configuration
+      const { data } = await db.queryOnce({
+        app: {
+          $users: { $: { where: { id: userId } } }
+        }
+      });
+      
+      const userApp = data?.app?.find((app: any) => 
+        app.$users?.some((u: any) => u.id === userId)
+      );
+      
+      // Load Turso configuration from the app entity
+      if (userApp?.tursoDbName && userApp?.tursoDbAuthToken) {
+        // Construct database URL from stored name
+        const url = `libsql://${userApp.tursoDbName}-tarfw.turso.io`;
+        const authToken = userApp.tursoDbAuthToken;
         updateUserTursoOptions(url, authToken);
-        console.log('✓ Loaded user-specific Turso database');
+        console.log('✓ Loaded user-specific Turso database from InstantDB');
       } else {
-        console.log('No Turso database found for user');
+        console.log('No Turso database configuration found for user');
       }
     } catch (error) {
       console.warn('Failed to load user Turso database:', error);
