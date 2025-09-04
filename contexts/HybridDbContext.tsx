@@ -198,14 +198,28 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     if (!sqliteDb) return;
     
     try {
-      const issues = await sqliteDb.getAllAsync<LocalIssue>(
-        'SELECT * FROM issues ORDER BY updatedAt DESC'
-      );
+      // Try to fetch issues (may fail if table was removed)
+      let issues: LocalIssue[] = [];
+      try {
+        issues = await sqliteDb.getAllAsync<LocalIssue>(
+          'SELECT * FROM issues ORDER BY updatedAt DESC'
+        );
+      } catch (error) {
+        // Table doesn't exist, that's fine
+        console.log('Issues table not found (expected after migration v3)');
+      }
       setLocalIssues(issues);
 
-      const comments = await sqliteDb.getAllAsync<LocalComment>(
-        'SELECT * FROM comments ORDER BY createdAt ASC'
-      );
+      // Try to fetch comments (may fail if table was removed)
+      let comments: LocalComment[] = [];
+      try {
+        comments = await sqliteDb.getAllAsync<LocalComment>(
+          'SELECT * FROM comments ORDER BY createdAt ASC'
+        );
+      } catch (error) {
+        // Table doesn't exist, that's fine
+        console.log('Comments table not found (expected after migration v3)');
+      }
       setLocalComments(comments);
 
       const notes = await sqliteDb.getAllAsync<LocalNote>(

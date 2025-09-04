@@ -21,23 +21,20 @@ export async function runMigrations(db: SQLiteDatabase) {
 }
 
 async function applyMigrations(db: SQLiteDatabase, currentDbVersion: number) {
-
-  // If the current version is already equal or newer, no migration is needed
-  if (currentDbVersion >= DATABASE_VERSION) {
-    return;
-  }
-
-  // Apply migrations based on version
+  // Apply migrations based on current version
+  // For a fresh database (version 0), all migrations should run
+  
+  // Version 0 -> 1: Create notes table
   if (currentDbVersion < 1) {
     await applyInitialMigration(db);
   }
 
-  // Items migration (version 1 -> 2)
+  // Version 1 -> 2: Create items tables
   if (currentDbVersion < 2) {
     await applyItemsMigration(db);
   }
 
-  // Remove issues/comments migration (version 2 -> 3)
+  // Version 2 -> 3: Remove issues/comments tables
   if (currentDbVersion < 3) {
     await removeIssuesAndCommentsTables(db);
   }
