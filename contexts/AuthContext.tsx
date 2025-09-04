@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserTursoDatabase = async (userId: string) => {
     try {
-      const { updateUserTursoOptions } = await import('@/contexts/HybridDbContext');
+      const { updateUserTursoOptions } = await import('@/contexts/TursoConfig');
       
       // Get user's app entity which contains Turso configuration
       const { data } = await db.queryOnce({
