@@ -9,14 +9,12 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   // Apply migrations first, then sync
   if (currentDbVersion < DATABASE_VERSION) {
-    console.log('Applying migrations before sync...');
     await applyMigrations(db, currentDbVersion);
   }
 
   // Now try to sync with remote
   try {
     await db.syncLibSQL();
-    console.log('Successfully synced with Turso after migration');
   } catch (e) {
     console.log('Error syncing libSQL after migration:', e);
   }
@@ -26,7 +24,6 @@ async function applyMigrations(db: SQLiteDatabase, currentDbVersion: number) {
 
   // If the current version is already equal or newer, no migration is needed
   if (currentDbVersion >= DATABASE_VERSION) {
-    console.log('No migration needed, DB version:', currentDbVersion);
     return;
   }
 
@@ -44,12 +41,9 @@ async function applyMigrations(db: SQLiteDatabase, currentDbVersion: number) {
 
   // Set the database version after migrations
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
-  console.log('Migration completed, DB version:', DATABASE_VERSION);
 }
 
 async function applyInitialMigration(db: SQLiteDatabase) {
-  console.log('Applying initial migration...');
-  
   // Create issues table
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS issues (
@@ -104,13 +98,9 @@ async function applyInitialMigration(db: SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(authorId);
     CREATE INDEX IF NOT EXISTS idx_comments_sync ON comments(syncedToInstant);
   `);
-
-  console.log('Initial migration applied successfully');
 }
 
 async function applyItemsMigration(db: SQLiteDatabase) {
-  console.log('Applying items migration...');
-  
   // Create items table
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS items (
@@ -160,8 +150,4 @@ async function applyItemsMigration(db: SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS idx_variants_status ON variants(status);
     CREATE INDEX IF NOT EXISTS idx_opvalues_group ON opvalues(groupId);
   `);
-
-  // Tables created successfully - no sample data inserted
-
-  console.log('Items migration applied successfully');
 }

@@ -161,7 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const url = `libsql://${userApp.tursoDbName}-tarfw.turso.io`;
         const authToken = userApp.tursoDbAuthToken;
         updateUserTursoOptions(url, authToken);
-        console.log('✓ Loaded user-specific Turso database from InstantDB');
       } else {
         console.log('No Turso database configuration found for user');
       }

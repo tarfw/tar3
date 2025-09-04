@@ -72,14 +72,13 @@ export default function AgentsScreen() {
       const platformToken = process.env.EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN;
       
       if (!platformToken) {
-        console.error('EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN environment variable is not set');
         return;
       }
       
       await instantPlatformService.saveToken(platformToken);
       setAccessToken(platformToken);
     } catch (error) {
-      console.error('Error initializing platform token:', error);
+      // Silent fail - token will be set when user logs in
     }
   };
 

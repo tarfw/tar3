@@ -50,12 +50,6 @@ function AppContent() {
 function AppWithTurso() {
   const { isTursoConfigured, tursoUrl, tursoAuthToken } = useTurso();
   
-  console.log('Turso configuration status:', {
-    isTursoConfigured,
-    tursoUrl: tursoUrl ? '[REDACTED]' : null,
-    tursoAuthToken: tursoAuthToken ? '[REDACTED]' : null
-  });
-
   return isTursoConfigured && tursoUrl && tursoAuthToken ? (
     <SQLiteProvider
       databaseName={TURSO_DB_NAME}

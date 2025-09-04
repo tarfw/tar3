@@ -286,17 +286,14 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
   // Sync with Turso cloud
   const syncWithTurso = useCallback(async () => {
     if (!sqliteDb) {
-      console.log('No SQLite database available for sync');
       return;
     }
     
-    console.log('Syncing with Turso...');
     setIsSyncing(true);
     
     try {
       await sqliteDb.syncLibSQL();
       await fetchLocalData();
-      console.log('Successfully synced with Turso');
     } catch (error) {
       console.error('Error syncing with Turso:', error);
     } finally {

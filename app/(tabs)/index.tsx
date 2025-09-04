@@ -212,12 +212,6 @@ export default function HomeScreen() {
 
   const filteredIssues = getFilteredIssues();
   
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Issues data:', data?.issues?.length || 0, 'issues found');
-    console.log('Filtered issues:', filteredIssues.length, 'for tab:', selectedTab);
-  }, [data?.issues, filteredIssues.length, selectedTab]);
-  
   // Group issues by status (simplified)
   const todoIssues = filteredIssues.filter(issue => issue.status === 'todo');
   const inProgressIssues = filteredIssues.filter(issue => issue.status === 'in-progress');

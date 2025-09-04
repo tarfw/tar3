@@ -47,12 +47,12 @@ export default function ItemsScreen() {
   };
 
   const handleSync = async () => {
-    try {
-      await hybridDb.syncWithTurso();
-    } catch (error) {
-      console.error('Sync error:', error);
-    }
-  };
+  try {
+    await hybridDb.syncWithTurso();
+  } catch (error) {
+    console.error('Sync error:', error);
+  }
+};
 
   const getTotalStock = (item: LocalItem): number => {
     const variants = hybridDb.getVariantsByItemId(item.id);
