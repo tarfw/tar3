@@ -1,6 +1,6 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 
 export async function runMigrations(db: SQLiteDatabase) {
   // Get current database version first
@@ -28,55 +28,46 @@ async function applyMigrations(db: SQLiteDatabase, currentDbVersion: number) {
   }
 
   // Apply migrations based on version
-  if (currentDbVersion === 0) {
+  if (currentDbVersion < 1) {
     await applyInitialMigration(db);
-    currentDbVersion = 1;
   }
 
-  // Future migrations can be added here
-  if (currentDbVersion === 1) {
+  // Items migration (version 1 -> 2)
+  if (currentDbVersion < 2) {
     await applyItemsMigration(db);
-    currentDbVersion = 2;
+  }
+
+  // Remove issues/comments migration (version 2 -> 3)
+  if (currentDbVersion < 3) {
+    await removeIssuesAndCommentsTables(db);
   }
 
   // Set the database version after migrations
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
 
+async function removeIssuesAndCommentsTables(db: SQLiteDatabase) {
+  // Drop indexes first
+  await db.execAsync(`
+    DROP INDEX IF EXISTS idx_issues_status;
+    DROP INDEX IF EXISTS idx_issues_priority;
+    DROP INDEX IF EXISTS idx_issues_assignee;
+    DROP INDEX IF EXISTS idx_issues_creator;
+    DROP INDEX IF EXISTS idx_issues_updated;
+    DROP INDEX IF EXISTS idx_issues_sync;
+    DROP INDEX IF EXISTS idx_comments_issue;
+    DROP INDEX IF EXISTS idx_comments_author;
+    DROP INDEX IF EXISTS idx_comments_sync;
+  `);
+  
+  // Drop tables
+  await db.execAsync(`
+    DROP TABLE IF EXISTS comments;
+    DROP TABLE IF EXISTS issues;
+  `);
+}
+
 async function applyInitialMigration(db: SQLiteDatabase) {
-  // Create issues table
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS issues (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      identifier TEXT NOT NULL,
-      priority INTEGER NOT NULL DEFAULT 3,
-      status TEXT NOT NULL DEFAULT 'todo',
-      statusColor TEXT NOT NULL DEFAULT '#94A3B8',
-      assigneeId TEXT,
-      creatorId TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      dueDate TEXT,
-      syncedToInstant BOOLEAN NOT NULL DEFAULT 0
-    );
-  `);
-
-  // Create comments table
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS comments (
-      id TEXT PRIMARY KEY NOT NULL,
-      body TEXT NOT NULL,
-      issueId TEXT NOT NULL,
-      authorId TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      syncedToInstant BOOLEAN NOT NULL DEFAULT 0,
-      FOREIGN KEY (issueId) REFERENCES issues (id) ON DELETE CASCADE
-    );
-  `);
-
   // Create notes table
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS notes (
@@ -88,15 +79,7 @@ async function applyInitialMigration(db: SQLiteDatabase) {
 
   // Create indexes for better performance
   await db.execAsync(`
-    CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
-    CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority);
-    CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assigneeId);
-    CREATE INDEX IF NOT EXISTS idx_issues_creator ON issues(creatorId);
-    CREATE INDEX IF NOT EXISTS idx_issues_updated ON issues(updatedAt);
-    CREATE INDEX IF NOT EXISTS idx_issues_sync ON issues(syncedToInstant);
-    CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issueId);
-    CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(authorId);
-    CREATE INDEX IF NOT EXISTS idx_comments_sync ON comments(syncedToInstant);
+    CREATE INDEX IF NOT EXISTS idx_notes_id ON notes(id);
   `);
 }
 
