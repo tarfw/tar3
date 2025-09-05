@@ -55,16 +55,14 @@ export default function SimpleProductsScreen() {
 
   const createProductsTable = async () => {
     // Create Turso database instance
-    const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
-      ? {
-          dbName: userAppRecord.tursoDbName,
-          authToken: userAppRecord.tursoDbAuthToken
-        }
-      : null;
+    if (!userAppRecord?.tursoDbName || !userAppRecord?.tursoDbAuthToken) {
+      return;
+    }
     
-    const tursoDb = useTursoDb(tursoConfig);
-    
-    if (!tursoDb) return;
+    const tursoDb = new TursoDb({
+      dbName: userAppRecord.tursoDbName,
+      authToken: userAppRecord.tursoDbAuthToken
+    });
     
     try {
       console.log('[SimpleProducts] Creating products table');
@@ -85,16 +83,15 @@ export default function SimpleProductsScreen() {
 
   const loadProducts = async () => {
     // Create Turso database instance
-    const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
-      ? {
-          dbName: userAppRecord.tursoDbName,
-          authToken: userAppRecord.tursoDbAuthToken
-        }
-      : null;
+    if (!userAppRecord?.tursoDbName || !userAppRecord?.tursoDbAuthToken) {
+      setProducts([]);
+      return;
+    }
     
-    const tursoDb = useTursoDb(tursoConfig);
-    
-    if (!tursoDb) return;
+    const tursoDb = new TursoDb({
+      dbName: userAppRecord.tursoDbName,
+      authToken: userAppRecord.tursoDbAuthToken
+    });
     
     try {
       setIsLoading(true);
@@ -189,16 +186,14 @@ export default function SimpleProductsScreen() {
 
   const handleCreateProduct = async () => {
     // Create Turso database instance
-    const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
-      ? {
-          dbName: userAppRecord.tursoDbName,
-          authToken: userAppRecord.tursoDbAuthToken
-        }
-      : null;
+    if (!userAppRecord?.tursoDbName || !userAppRecord?.tursoDbAuthToken || !newProduct.name.trim()) {
+      return;
+    }
     
-    const tursoDb = useTursoDb(tursoConfig);
-    
-    if (!tursoDb || !newProduct.name.trim()) return;
+    const tursoDb = new TursoDb({
+      dbName: userAppRecord.tursoDbName,
+      authToken: userAppRecord.tursoDbAuthToken
+    });
     
     try {
       setIsLoading(true);
@@ -307,7 +302,7 @@ export default function SimpleProductsScreen() {
     );
   }
 
-  if (!tursoDb) {
+  if (!userAppRecord?.tursoDbName || !userAppRecord?.tursoDbAuthToken) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.emptyState}>
