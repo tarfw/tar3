@@ -5,11 +5,8 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 
 export function SyncSettings() {
   const {
-    syncWithTurso,
     syncWithInstant,
-    toggleAutoSync,
     isSyncing,
-    isAutoSyncEnabled,
     localIssues,
     localComments,
   } = useHybridDb();
@@ -20,20 +17,7 @@ export function SyncSettings() {
   const cardColor = useThemeColor({}, 'card') || '#f8f9fa';
   const borderColor = useThemeColor({}, 'border') || '#e1e5e9';
 
-  const [syncing, setSyncing] = useState<'turso' | 'instant' | null>(null);
-
-  const handleManualTursoSync = async () => {
-    setSyncing('turso');
-    try {
-      await syncWithTurso();
-      Alert.alert('Success', 'Successfully synced with Turso database');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to sync with Turso database');
-      console.error('Turso sync error:', error);
-    } finally {
-      setSyncing(null);
-    }
-  };
+  const [syncing, setSyncing] = useState<'instant' | null>(null);
 
   const handleManualInstantSync = async () => {
     setSyncing('instant');
@@ -45,16 +29,6 @@ export function SyncSettings() {
       console.error('Instant sync error:', error);
     } finally {
       setSyncing(null);
-    }
-  };
-
-  const handleAutoSyncToggle = (value: boolean) => {
-    toggleAutoSync(value);
-    if (value) {
-      Alert.alert(
-        'Auto-sync Enabled',
-        'Your data will automatically sync every 30 seconds when connected to the internet.'
-      );
     }
   };
 
@@ -79,37 +53,6 @@ export function SyncSettings() {
       }}>
         Database Synchronization
       </Text>
-
-      {/* Auto-sync toggle */}
-      <View style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-      }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{
-            fontSize: 16,
-            color: textColor,
-            fontWeight: '500',
-          }}>
-            Auto-sync
-          </Text>
-          <Text style={{
-            fontSize: 14,
-            color: textColor + '80',
-            marginTop: 2,
-          }}>
-            Automatically sync every 30 seconds
-          </Text>
-        </View>
-        <Switch
-          value={isAutoSyncEnabled}
-          onValueChange={handleAutoSyncToggle}
-          trackColor={{ false: borderColor, true: tintColor + '40' }}
-          thumbColor={isAutoSyncEnabled ? tintColor : '#f4f3f4'}
-        />
-      </View>
 
       {/* Sync status */}
       <View style={{
@@ -155,32 +98,6 @@ export function SyncSettings() {
       {/* Manual sync buttons */}
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <TouchableOpacity
-          onPress={handleManualTursoSync}
-          disabled={syncing === 'turso' || isSyncing}
-          style={{
-            flex: 1,
-            backgroundColor: syncing === 'turso' ? borderColor : tintColor,
-            padding: 12,
-            borderRadius: 8,
-            alignItems: 'center',
-            flexDirection: 'row',
-            justifyContent: 'center',
-            opacity: (syncing === 'turso' || isSyncing) ? 0.6 : 1,
-          }}
-        >
-          {syncing === 'turso' ? (
-            <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
-          ) : null}
-          <Text style={{
-            color: 'white',
-            fontWeight: '500',
-            fontSize: 14,
-          }}>
-            {syncing === 'turso' ? 'Syncing...' : 'Sync Turso'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           onPress={handleManualInstantSync}
           disabled={syncing === 'instant' || isSyncing || unsyncedIssuesCount === 0}
           style={{
@@ -202,7 +119,7 @@ export function SyncSettings() {
             fontWeight: '500',
             fontSize: 14,
           }}>
-            {syncing === 'instant' ? 'Syncing...' : 'Sync Instant'}
+            {syncing === 'instant' ? 'Syncing...' : 'Sync Now'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -215,8 +132,7 @@ export function SyncSettings() {
         marginTop: 12,
         lineHeight: 16,
       }}>
-        Turso provides offline-first local storage with cloud sync.{'\n'}
-        Instant DB enables real-time collaboration features.
+        Sync enables real-time collaboration features.
       </Text>
     </View>
   );

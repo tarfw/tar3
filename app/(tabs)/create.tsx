@@ -40,12 +40,6 @@ export default function CreateScreen() {
       route: '/files',
     },
     {
-      icon: 'cube.box',
-      title: 'Items',
-      color: '#10b981',
-      route: '/items',
-    },
-    {
       icon: 'doc.text',
       title: 'Tasks',
       color: colors.warning,
@@ -88,8 +82,6 @@ export default function CreateScreen() {
       route: '/posts',
     },
   ];
-
-  
 
   const renderCreateOption = (option: CreateOption, index: number, styles: any) => (
     <TouchableOpacity

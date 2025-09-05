@@ -76,7 +76,7 @@ export default function GroupsScreen() {
 
   const handleSync = async () => {
     try {
-      await hybridDb.syncWithTurso();
+      await hybridDb.syncWithInstant();
     } catch (error) {
       console.error('Sync error:', error);
     }

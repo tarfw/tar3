@@ -125,11 +125,8 @@ interface HybridDbContextType {
   createOpValue: (value: Omit<LocalOpValue, 'id'>) => Promise<LocalOpValue | undefined>;
   
   // Sync operations
-  syncWithTurso: () => Promise<void>;
   syncWithInstant: () => Promise<void>;
-  toggleAutoSync: (enabled: boolean) => void;
   isSyncing: boolean;
-  isAutoSyncEnabled: boolean;
   
   // Combined data getters
   getAllIssues: () => LocalIssue[]; // Prioritizes local data
@@ -172,26 +169,13 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
   const [instantIssues, setInstantIssues] = useState<Issue[]>([]);
   const [instantComments, setInstantComments] = useState<Comment[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isAutoSyncEnabled, setIsAutoSyncEnabled] = useState(false);
   
-  // Sync interval ref
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
   // Initialize and fetch data
   useEffect(() => {
     if (sqliteDb) {
       fetchLocalData();
     }
   }, [sqliteDb]);
-
-  // Auto-sync interval management
-  useEffect(() => {
-    return () => {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
-    };
-  }, []);
 
   // Fetch local data from SQLite/Turso
   const fetchLocalData = useCallback(async () => {
@@ -241,7 +225,7 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       const opGroups = await sqliteDb.getAllAsync<LocalOpGroup>(
         'SELECT * FROM opgroups ORDER BY id ASC'
       );
-      setLocalOpGroups(opGroups);
+      setLocalOpGroups(opgroups);
 
       const opValues = await sqliteDb.getAllAsync<LocalOpValue>(
         'SELECT * FROM opvalues ORDER BY groupId ASC, id ASC'
@@ -280,24 +264,6 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       console.error('Error fetching items data:', error);
     }
   }, [sqliteDb]);
-
-  // Sync with Turso cloud
-  const syncWithTurso = useCallback(async () => {
-    if (!sqliteDb) {
-      return;
-    }
-    
-    setIsSyncing(true);
-    
-    try {
-      await sqliteDb.syncLibSQL();
-      await fetchLocalData();
-    } catch (error) {
-      console.error('Error syncing with Turso:', error);
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [sqliteDb, fetchLocalData]);
 
   // Sync with Instant DB (for realtime features)
   const syncWithInstant = useCallback(async () => {
@@ -349,25 +315,6 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       console.error('Error syncing to Instant DB:', error);
     }
   }, [sqliteDb, localIssues, localComments, fetchLocalData]);
-
-  // Toggle auto-sync
-  const toggleAutoSync = useCallback((enabled: boolean) => {
-    setIsAutoSyncEnabled(enabled);
-    
-    if (enabled && sqliteDb) {
-      console.log('Starting auto-sync...');
-      // Sync immediately when enabled
-      syncWithTurso();
-      // Set up interval for regular syncing
-      syncIntervalRef.current = setInterval(() => {
-        syncWithTurso();
-        syncWithInstant();
-      }, 30000) as NodeJS.Timeout; // Sync every 30 seconds
-    } else if (syncIntervalRef.current) {
-      console.log('Stopping auto-sync...');
-      clearInterval(syncIntervalRef.current);
-    }
-  }, [sqliteDb, syncWithTurso, syncWithInstant]);
 
   // Create issue (local-first)
   const createIssue = useCallback(async (data: Omit<LocalIssue, 'id' | 'createdAt' | 'updatedAt' | 'syncedToInstant'>): Promise<LocalIssue | undefined> => {
@@ -837,11 +784,8 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     deleteVariant,
     createOpGroup,
     createOpValue,
-    syncWithTurso,
     syncWithInstant,
-    toggleAutoSync,
     isSyncing,
-    isAutoSyncEnabled,
     getAllIssues,
     getIssueById,
     getCommentsForIssue,

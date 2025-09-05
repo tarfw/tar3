@@ -32,8 +32,6 @@ function AppContent() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="issue/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="create-issue" options={{ headerShown: false }} />
-          <Stack.Screen name="items" options={{ headerShown: false }} />
-          <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="groups" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ headerShown: false }} />
           <Stack.Screen name="agents" options={{ headerShown: false }} />

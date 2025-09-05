@@ -13,12 +13,9 @@ This document outlines the simplified app initialization flow that removes unnec
 - Check if user already has an app in InstantDB
 - If app exists:
   - Load the existing app
-  - Load user's Turso database configuration
 - If no app exists:
   - Create new InstantDB app
   - Link user to app
-  - Create dedicated Turso database
-  - Save Turso configuration to InstantDB
   - Configure HybridDbContext
 
 ### 3. Navigation
@@ -46,14 +43,11 @@ This document outlines the simplified app initialization flow that removes unnec
 1. **`initializeUserApp()`**: Main initialization orchestrator
 2. **`findUserApp()`**: Check if user already has an app
 3. **`createNewAppForUser()`**: Create app for new users
-4. **`loadUserTursoDatabase()`**: Configure Turso database access
 
 ### Database Creation
 For new users, the app creates:
 1. **InstantDB App**: For real-time collaboration features
-2. **Turso SQLite Database**: For local-first data storage
-3. **User Linking**: Ensures proper user-app associations
-4. **Configuration Storage**: Turso DB info stored in InstantDB
+2. **User Linking**: Ensures proper user-app associations
 
 ### Type Safety
 - Clean TypeScript types without complex state machines
@@ -84,8 +78,6 @@ With the simplified flow, you should see:
 ```
 ✓ Created InstantDB app for user
 ✓ Linked app to user
-✓ Created Turso database for user
-✓ Loaded user-specific Turso database
 ```
 
 ## Testing

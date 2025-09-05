@@ -47,19 +47,11 @@ export default function NotesScreen() {
     }
   };
 
-  const handlePullSync = async () => {
+  const handleSync = async () => {
     try {
-      await hybridDb.syncWithTurso();
+      await hybridDb.syncWithInstant();
     } catch (error) {
       console.error('Sync error:', error);
-    }
-  };
-
-  const handlePushSync = async () => {
-    try {
-      await hybridDb.syncWithTurso();
-    } catch (error) {
-      console.error('Push sync error:', error);
     }
   };
 
@@ -140,16 +132,10 @@ export default function NotesScreen() {
         </View>
         <View style={styles.headerButtons}>
           <TouchableOpacity
-            onPress={handlePullSync}
+            onPress={handleSync}
             style={styles.headerButton}
           >
-            <Text style={[styles.headerButtonText, { color: tintColor }]}>Pull</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handlePushSync}
-            style={styles.headerButton}
-          >
-            <Text style={[styles.headerButtonText, { color: tintColor }]}>Push</Text>
+            <Text style={[styles.headerButtonText, { color: tintColor }]}>Sync</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleCreateNote}

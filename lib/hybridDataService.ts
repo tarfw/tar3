@@ -1,7 +1,7 @@
 import { useHybridDb, LocalIssue, LocalComment } from '@/contexts/HybridDbContext';
 import { DataService as InstantDataService } from './dataService';
 
-// Enhanced data service that works with both Turso and Instant DB
+// Enhanced data service that works with Instant DB
 export class HybridDataService {
   
   // Create issue using hybrid approach (local-first)
@@ -118,20 +118,8 @@ export class HybridDataService {
   }
 
   // Sync operations
-  static async syncWithTurso(hybridDb: ReturnType<typeof useHybridDb>): Promise<void> {
-    await hybridDb.syncWithTurso();
-  }
-
   static async syncWithInstant(hybridDb: ReturnType<typeof useHybridDb>): Promise<void> {
     await hybridDb.syncWithInstant();
-  }
-
-  // Enable/disable auto-sync
-  static toggleAutoSync(
-    hybridDb: ReturnType<typeof useHybridDb>,
-    enabled: boolean
-  ): void {
-    hybridDb.toggleAutoSync(enabled);
   }
 
   // Utility functions for working with the data
@@ -180,7 +168,6 @@ export class HybridDataService {
       unsyncedIssues: allIssues.filter(issue => !issue.syncedToInstant).length,
       unsyncedComments: allComments.filter(comment => !comment.syncedToInstant).length,
       isSyncing: hybridDb.isSyncing,
-      isAutoSyncEnabled: hybridDb.isAutoSyncEnabled,
     };
   }
 }

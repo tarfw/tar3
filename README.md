@@ -37,18 +37,17 @@ You can start developing by editing the files inside the **app** directory. This
 This app uses a hybrid database approach:
 
 1. **InstantDB** - Used for real-time collaboration features and user authentication
-2. **Turso (SQLite)** - Used for local-first data storage with automatic synchronization
+2. **SQLite** - Used for local-first data storage with automatic synchronization
 
 ### Database Creation
 
 For each new user, the app automatically creates:
 - A dedicated InstantDB database for real-time features
-- A dedicated Turso SQLite database for local-first storage
 - Database configuration stored in InstantDB for persistence across devices
 
-The Turso integration provides:
-- Offline-first capability with local SQLite storage
-- Automatic synchronization with the cloud when online
+The SQLite integration provides:
+- Offline-first capability with local storage
+- Automatic synchronization with InstantDB when online
 - Per-user isolated databases for data privacy
 - Database configuration stored in InstantDB for persistence across devices
 
@@ -57,7 +56,7 @@ The Turso integration provides:
 The authentication process is straightforward:
 1. User authenticates with InstantDB (magic code flow)
 2. System checks if user already has an app
-3. If not, creates InstantDB app and Turso database
+3. If not, creates InstantDB app
 4. Links user to their databases
 5. Configures HybridDbContext for user-specific data
 6. Navigates to main app
