@@ -45,26 +45,25 @@ export default function SimpleProductsScreen() {
     category: '',
     stock: '',
   });
-  
-  // Turso database configuration
-  const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
-    ? {
-        dbName: userAppRecord.tursoDbName,
-        authToken: userAppRecord.tursoDbAuthToken
-      }
-    : null;
-  
-  // Initialize Turso database
-  const tursoDb = useTursoDb(tursoConfig);
 
-  // Load products when Turso database is ready
+  // Load products when Turso database config is ready
   useEffect(() => {
-    if (tursoDb) {
+    if (userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken) {
       loadProducts();
     }
-  }, [tursoDb]);
+  }, [userAppRecord?.tursoDbName, userAppRecord?.tursoDbAuthToken]);
 
   const createProductsTable = async () => {
+    // Create Turso database instance
+    const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
+      ? {
+          dbName: userAppRecord.tursoDbName,
+          authToken: userAppRecord.tursoDbAuthToken
+        }
+      : null;
+    
+    const tursoDb = useTursoDb(tursoConfig);
+    
     if (!tursoDb) return;
     
     try {
@@ -85,6 +84,16 @@ export default function SimpleProductsScreen() {
   };
 
   const loadProducts = async () => {
+    // Create Turso database instance
+    const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
+      ? {
+          dbName: userAppRecord.tursoDbName,
+          authToken: userAppRecord.tursoDbAuthToken
+        }
+      : null;
+    
+    const tursoDb = useTursoDb(tursoConfig);
+    
     if (!tursoDb) return;
     
     try {
@@ -179,6 +188,16 @@ export default function SimpleProductsScreen() {
   };
 
   const handleCreateProduct = async () => {
+    // Create Turso database instance
+    const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
+      ? {
+          dbName: userAppRecord.tursoDbName,
+          authToken: userAppRecord.tursoDbAuthToken
+        }
+      : null;
+    
+    const tursoDb = useTursoDb(tursoConfig);
+    
     if (!tursoDb || !newProduct.name.trim()) return;
     
     try {
