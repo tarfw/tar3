@@ -1,5 +1,5 @@
 // Turso Service - Handles creating Turso databases for users
-import { createClient } from '@libsql/client';
+import { TursoHttpService } from './tursoHttpService';
 
 export const tursoService = {
   /**

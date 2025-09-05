@@ -1,4 +1,4 @@
-import { createClient } from '@libsql/client';
+
 import { SQLiteDatabase, useSQLiteContext } from 'expo-sqlite';
 import {
   createContext,
