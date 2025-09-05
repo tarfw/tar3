@@ -102,30 +102,64 @@ export default function SimpleProductsScreen() {
       if (result && result.results && result.results.length > 0) {
         // The first result should be the execute response
         const executeResult = result.results[0];
+        console.log('[SimpleProducts] Execute result:', JSON.stringify(executeResult, null, 2));
+        
         if (executeResult && executeResult.type === 'ok' && executeResult.response && executeResult.response.result) {
           const rows = executeResult.response.result.rows || [];
           const cols = executeResult.response.result.cols || [];
           
-          console.log('[SimpleProducts] Rows:', rows);
-          console.log('[SimpleProducts] Cols:', cols);
+          console.log('[SimpleProducts] Rows:', JSON.stringify(rows, null, 2));
+          console.log('[SimpleProducts] Cols:', JSON.stringify(cols, null, 2));
+          
+          // Check if rows and cols are valid arrays
+          if (!Array.isArray(rows)) {
+            console.error('[SimpleProducts] Rows is not an array:', typeof rows);
+            setProducts([]);
+            return;
+          }
+          
+          if (!Array.isArray(cols)) {
+            console.error('[SimpleProducts] Cols is not an array:', typeof cols);
+            setProducts([]);
+            return;
+          }
           
           // Convert rows to objects using column names
-          const productsData = rows.map((row: any) => {
+          const productsData = rows.map((row: any, rowIndex: number) => {
+            console.log(`[SimpleProducts] Processing row ${rowIndex}:`, JSON.stringify(row, null, 2));
+            
             const product: any = {};
-            cols.forEach((col: any, index: number) => {
-              product[col.name] = row[index];
-            });
+            // Ensure cols is an array and row is an array
+            if (Array.isArray(cols) && Array.isArray(row)) {
+              cols.forEach((col: any, index: number) => {
+                // Ensure col has a name property
+                if (col && col.name) {
+                  product[col.name] = row[index];
+                } else {
+                  console.warn(`[SimpleProducts] Invalid column at index ${index}:`, col);
+                }
+              });
+            } else {
+              console.warn(`[SimpleProducts] Invalid cols or row at index ${rowIndex}`, { colsType: typeof cols, rowType: typeof row });
+            }
             return product;
-          }).map((row: any) => ({
-            id: row.id || 0,
-            name: row.name || '',
-            description: row.description || null,
-            price: typeof row.price === 'string' ? parseFloat(row.price) || 0 : row.price || 0,
-            category: row.category || null,
-            stock: typeof row.stock === 'string' ? parseInt(row.stock) || 0 : row.stock || 0,
-            created_at: row.created_at || null,
-          }));
+          }).map((row: any, index: number) => {
+            console.log(`[SimpleProducts] Mapping row ${index} to product:`, JSON.stringify(row, null, 2));
+            
+            return {
+              id: (row.id !== undefined && row.id !== null) ? (typeof row.id === 'string' ? parseInt(row.id) || 0 : row.id) : 0,
+              name: (row.name !== undefined && row.name !== null) ? String(row.name) : '',
+              description: (row.description !== undefined && row.description !== null) ? String(row.description) : null,
+              price: (row.price !== undefined && row.price !== null) ? 
+                (typeof row.price === 'string' ? parseFloat(row.price) || 0 : typeof row.price === 'number' ? row.price : 0) : 0,
+              category: (row.category !== undefined && row.category !== null) ? String(row.category) : null,
+              stock: (row.stock !== undefined && row.stock !== null) ? 
+                (typeof row.stock === 'string' ? parseInt(row.stock) || 0 : typeof row.stock === 'number' ? row.stock : 0) : 0,
+              created_at: (row.created_at !== undefined && row.created_at !== null) ? String(row.created_at) : null,
+            };
+          });
           
+          console.log('[SimpleProducts] Final products data:', JSON.stringify(productsData, null, 2));
           setProducts(productsData);
           console.log('[SimpleProducts] Loaded products:', productsData.length);
         } else {
@@ -185,34 +219,49 @@ export default function SimpleProductsScreen() {
     }
   };
 
-  const renderProductCard = (product: Product, index: number) => (
-    <View
-      key={index}
-      style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-    >
-      <View style={styles.productHeader}>
-        <Text style={[styles.productName, { color: colors.text }]}>{product.name}</Text>
-        <Text style={[styles.productPrice, { color: colors.primary }]}>
-          ${typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
-        </Text>
-      </View>
-      {product.description ? (
-        <Text style={[styles.productDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-          {product.description}
-        </Text>
-      ) : null}
-      <View style={styles.productMeta}>
-        {product.category ? (
-          <Text style={[styles.productCategory, { color: colors.textSecondary }]}>
-            {product.category}
+  const renderProductCard = (product: Product, index: number) => {
+    // Add defensive checks
+    if (!product) {
+      console.warn('[SimpleProducts] renderProductCard received null product at index', index);
+      return null;
+    }
+    
+    // Ensure all values are proper types
+    const safeName = (product.name && typeof product.name === 'string') ? product.name : 'Unknown Product';
+    const safePrice = (typeof product.price === 'number') ? product.price : 0;
+    const safeDescription = (product.description && typeof product.description === 'string') ? product.description : null;
+    const safeCategory = (product.category && typeof product.category === 'string') ? product.category : null;
+    const safeStock = (typeof product.stock === 'number') ? product.stock : 0;
+    
+    return (
+      <View
+        key={index}
+        style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
+        <View style={styles.productHeader}>
+          <Text style={[styles.productName, { color: colors.text }]}>{safeName}</Text>
+          <Text style={[styles.productPrice, { color: colors.primary }]}>
+            ${safePrice.toFixed(2)}
+          </Text>
+        </View>
+        {safeDescription ? (
+          <Text style={[styles.productDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+            {safeDescription}
           </Text>
         ) : null}
-        <Text style={[styles.productStock, { color: colors.textSecondary }]}>
-          Stock: {typeof product.stock === 'number' ? product.stock : 0}
-        </Text>
+        <View style={styles.productMeta}>
+          {safeCategory ? (
+            <Text style={[styles.productCategory, { color: colors.textSecondary }]}>
+              {safeCategory}
+            </Text>
+          ) : null}
+          <Text style={[styles.productStock, { color: colors.textSecondary }]}>
+            Stock: {safeStock}
+          </Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   if (!user) {
     return (
@@ -302,7 +351,7 @@ export default function SimpleProductsScreen() {
               </View>
             ) : (
               <View style={styles.productsList}>
-                {products.map((product, index) => renderProductCard(product, index))}
+                {products.filter(product => product && typeof product === 'object').map((product, index) => renderProductCard(product, index))}
               </View>
             )}
           </View>
