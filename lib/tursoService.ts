@@ -115,15 +115,6 @@ export const tursoService = {
         dbUrl = `libsql://${dbName}.turso.io`;
       }
 
-      // Validate that we have a proper database URL
-      if (!dbUrl || !dbUrl.startsWith('libsql://')) {
-        throw new Error('Invalid database URL received from Turso API');
-      }
-
-      // Extract the hostname from the libsql URL for HTTPS access
-      const hostname = dbUrl.replace('libsql://', '');
-      const httpsUrl = `https://${hostname}`;
-
       const result = {
         name: dbName,
         url: dbUrl, // Keep the libsql URL for compatibility
