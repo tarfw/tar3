@@ -14,7 +14,6 @@ import { SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/contexts/AuthContext';
-import { HybridDbProvider } from '@/contexts/HybridDbContext';
 import { ThemeProvider, useColorScheme } from '@/contexts/ThemeContext';
 import { TursoProvider, useTurso } from '@/contexts/TursoContext';
 import { runMigrations } from '@/lib/migrations';
@@ -40,6 +39,7 @@ function AppContent() {
           <Stack.Screen name="aichat" options={{ headerShown: false }} />
           <Stack.Screen name="tables" options={{ headerShown: false }} />
           <Stack.Screen name="posts" options={{ headerShown: false }} />
+          <Stack.Screen name="products" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -57,18 +57,10 @@ function AppWithTurso() {
       databaseName={TURSO_DB_NAME}
       onInit={(db: SQLiteDatabase) => runMigrations(db)}
     >
-      <HybridDbProvider 
-        enableTurso={true}
-        tursoUrl={tursoUrl}
-        tursoAuthToken={tursoAuthToken}
-      >
-        <AppContent />
-      </HybridDbProvider>
+      <AppContent />
     </SQLiteProvider>
   ) : (
-    <HybridDbProvider enableTurso={false}>
-      <AppContent />
-    </HybridDbProvider>
+    <AppContent />
   );
 }
 

@@ -151,8 +151,8 @@ export default function AgentsScreen() {
       
       switch (appTemplate) {
         case 'todo':
-          schema = InstantPlatformService.createBasicTodoSchema();
-          perms = InstantPlatformService.createBasicTodoPermissions();
+          schema = InstantPlatformService.createDefaultTaskSchema();
+          perms = InstantPlatformService.createDefaultTaskPermissions();
           break;
         case 'chat':
           schema = InstantPlatformService.createChatAppSchema();

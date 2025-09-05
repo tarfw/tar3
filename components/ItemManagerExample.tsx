@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Button, FlatList, StyleSheet } from 'react-native';
-import { useHybridDb } from '@/contexts/HybridDbContext';
+// Note: HybridDb removed - this component needs to be updated for local-first approach
 
 export default function ItemManager() {
   const {

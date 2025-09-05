@@ -248,46 +248,153 @@ export class InstantPlatformService {
   }
 
   // Schema Helpers
-  static createBasicTodoSchema(): InstantSchemaDef {
+  static createDefaultTaskSchema(): InstantSchemaDef {
     return i.schema({
       entities: {
-        todos: i.entity({
+        task: i.entity({
           title: i.string(),
-          done: i.boolean(),
+          description: i.string().optional(),
+          type: i.string(),
+          status: i.string(),
+          priority: i.number().optional(),
+          dueDate: i.date().optional(),
+          completedAt: i.date().optional(),
           createdAt: i.date(),
-          createdBy: i.string(),
+          updatedAt: i.date(),
+          metadata: i.json(),
         }),
-        users: i.entity({
+        people: i.entity({
           name: i.string(),
-          email: i.string().unique(),
-          createdAt: i.date(),
+          email: i.string().optional(),
+          avatarUrl: i.string().optional(),
         }),
+        team: i.entity({
+          name: i.string(),
+          key: i.string(),
+          description: i.string().optional(),
+        }),
+        project: i.entity({
+          name: i.string(),
+          description: i.string().optional(),
+          state: i.string(),
+          startDate: i.date().optional(),
+          targetDate: i.date().optional(),
+        }),
+      },
+      links: {
+        peopleToTeam: {
+          forward: {
+            on: "people",
+            has: "one",
+            label: "team",
+          },
+          reverse: {
+            on: "team",
+            has: "many",
+            label: "people",
+          },
+        },
+        taskCreator: {
+          forward: {
+            on: "task",
+            has: "one",
+            label: "creator",
+          },
+          reverse: {
+            on: "people",
+            has: "many",
+            label: "createdTasks",
+          },
+        },
+        taskAssigneePeople: {
+          forward: {
+            on: "task",
+            has: "one",
+            label: "assigneePerson",
+          },
+          reverse: {
+            on: "people",
+            has: "many",
+            label: "assignedTasks",
+          },
+        },
+        taskAssigneeTeam: {
+          forward: {
+            on: "task",
+            has: "one",
+            label: "assigneeTeam",
+          },
+          reverse: {
+            on: "team",
+            has: "many",
+            label: "assignedTasks",
+          },
+        },
+        taskTeam: {
+          forward: {
+            on: "task",
+            has: "one",
+            label: "team",
+          },
+          reverse: {
+            on: "team",
+            has: "many",
+            label: "tasks",
+          },
+        },
+        taskProject: {
+          forward: {
+            on: "task",
+            has: "one",
+            label: "project",
+          },
+          reverse: {
+            on: "project",
+            has: "many",
+            label: "tasks",
+          },
+        },
       },
     });
   }
 
-  static createBasicTodoPermissions(): InstantRules {
+  static createDefaultTaskPermissions(): InstantRules {
     return {
       $default: {
         allow: {
           $default: false,
         },
       },
-      todos: {
+      task: {
         allow: {
           view: 'true',
           create: 'auth.id != null',
-          update: 'auth.id == data.createdBy',
-          delete: 'auth.id == data.createdBy',
+          update: 'auth.id != null',
+          delete: 'auth.id != null',
         },
-        bind: ['createdBy', 'auth.id'],
       },
-      users: {
+      people: {
         allow: {
           view: 'true',
           create: 'auth.id != null',
-          update: 'auth.id == data.id',
-          delete: 'auth.id == data.id',
+          update: 'auth.id != null',
+          delete: 'auth.id != null',
+        },
+      },
+      team: {
+        allow: {
+          view: 'true',
+          create: 'auth.id != null',
+          update: 'auth.id != null',
+          delete: 'auth.id != null',
+        },
+      },
+      project: {
+        allow: {
+          view: 'true',
+          create: 'auth.id != null',
+          update: 'auth.id != null',
+          delete: 'auth.id != null',
         },
       },
     };

@@ -157,8 +157,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Create app with default template
       const newApp = await instantPlatformService.createApp({
         title: userEmail?.split('@')[0] || 'User',
-        schema: InstantPlatformService.createBasicTodoSchema(),
-        perms: InstantPlatformService.createBasicTodoPermissions(),
+        schema: InstantPlatformService.createDefaultTaskSchema(),
+        perms: InstantPlatformService.createDefaultTaskPermissions(),
       });
 
       let appId;

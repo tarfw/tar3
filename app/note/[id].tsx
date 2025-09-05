@@ -1,4 +1,4 @@
-import { useHybridDb } from '@/contexts/HybridDbContext';
+// Note: HybridDb removed - this component needs to be updated for local-first approach
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';

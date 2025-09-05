@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Switch, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { useHybridDb } from '@/contexts/HybridDbContext';
+// Note: HybridDb removed - this component needs to be updated for local-first approach
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 export function SyncSettings() {

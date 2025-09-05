@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { LocalNote, useHybridDb } from '@/contexts/HybridDbContext';
+// Note: HybridDb removed - this component needs to be updated for local-first approach
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
