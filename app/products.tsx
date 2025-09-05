@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { TursoHttpService } from '@/lib/tursoHttpService';
+import { TursoDb, useTursoDb } from '@/lib/tursoDb';
 
 interface Product {
   id: number;
@@ -29,7 +29,7 @@ interface Product {
   created_at: string;
 }
 
-export default function ProductsScreen() {
+export default function SimpleProductsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, userAppRecord } = useAuth();
@@ -46,69 +46,57 @@ export default function ProductsScreen() {
     stock: '',
   });
   
-  // Turso service
-  const [tursoService, setTursoService] = useState<TursoHttpService | null>(null);
-
-  // Initialize Turso service when userAppRecord is available
-  useEffect(() => {
-    if (userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken) {
-      // Log the database info for debugging
-      console.log('[Products] Turso database info:', {
+  // Turso database configuration
+  const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
+    ? {
         dbName: userAppRecord.tursoDbName,
-        hostname: userAppRecord.tursoDbHostname,
-        authToken: userAppRecord.tursoDbAuthToken ? '***' : 'missing'
-      });
-      
-      // Use the stored hostname if available, otherwise construct it
-      const hostname = userAppRecord.tursoDbHostname || `${userAppRecord.tursoDbName}.turso.io`;
-      const dbUrl = `https://${hostname}`;
-      console.log('[Products] Constructed Turso URL:', dbUrl);
-      
-      const service = new TursoHttpService(dbUrl, userAppRecord.tursoDbAuthToken);
-      setTursoService(service);
-      
-      // Create products table if it doesn't exist
-      createProductsTable(service);
-    } else {
-      console.log('[Products] Missing Turso database info:', {
-        hasDbName: !!userAppRecord?.tursoDbName,
-        hasAuthToken: !!userAppRecord?.tursoDbAuthToken
-      });
-    }
-  }, [userAppRecord]);
+        authToken: userAppRecord.tursoDbAuthToken
+      }
+    : null;
+  
+  // Initialize Turso database
+  const tursoDb = useTursoDb(tursoConfig);
 
-  // Load products when Turso service is ready
+  // Load products when Turso database is ready
   useEffect(() => {
-    if (tursoService) {
+    if (tursoDb) {
       loadProducts();
     }
-  }, [tursoService]);
+  }, [tursoDb]);
 
-  const createProductsTable = async (service: TursoHttpService) => {
+  const createProductsTable = async () => {
+    if (!tursoDb) return;
+    
     try {
-      await service.executeQuery(`
-        CREATE TABLE IF NOT EXISTS products (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          price REAL NOT NULL DEFAULT 0,
-          category TEXT,
-          stock INTEGER NOT NULL DEFAULT 0,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
+      console.log('[SimpleProducts] Creating products table');
+      await tursoDb.createTable('products', `
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        price REAL NOT NULL DEFAULT 0,
+        category TEXT,
+        stock INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
       `);
-      console.log('[Products] Products table ensured');
+      console.log('[SimpleProducts] Products table created successfully');
     } catch (error) {
-      console.error('[Products] Error creating products table:', error);
+      console.error('[SimpleProducts] Error creating products table:', error);
     }
   };
 
   const loadProducts = async () => {
-    if (!tursoService) return;
+    if (!tursoDb) return;
     
     try {
       setIsLoading(true);
-      const result = await tursoService.selectFromTable('products', '1=1 ORDER BY created_at DESC');
+      
+      // Create table if it doesn't exist
+      await createProductsTable();
+      
+      console.log('[SimpleProducts] Loading products');
+      const result = await tursoDb.selectFromTable('products', '1=1 ORDER BY created_at DESC');
+      
+      console.log('[SimpleProducts] Products query result:', JSON.stringify(result, null, 2));
       
       if (result && result.results && result.results.length > 0) {
         const productsData = result.results[0].map((row: any) => ({
@@ -121,11 +109,13 @@ export default function ProductsScreen() {
           created_at: row[6],
         }));
         setProducts(productsData);
+        console.log('[SimpleProducts] Loaded products:', productsData.length);
       } else {
         setProducts([]);
+        console.log('[SimpleProducts] No products found');
       }
     } catch (error) {
-      console.error('[Products] Error loading products:', error);
+      console.error('[SimpleProducts] Error loading products:', error);
       Alert.alert('Error', 'Failed to load products');
     } finally {
       setIsLoading(false);
@@ -133,7 +123,7 @@ export default function ProductsScreen() {
   };
 
   const handleCreateProduct = async () => {
-    if (!tursoService || !newProduct.name.trim()) return;
+    if (!tursoDb || !newProduct.name.trim()) return;
     
     try {
       setIsLoading(true);
@@ -146,7 +136,8 @@ export default function ProductsScreen() {
         stock: parseInt(newProduct.stock) || 0,
       };
       
-      await tursoService.insertIntoTable('products', productData);
+      console.log('[SimpleProducts] Creating product:', productData);
+      await tursoDb.insertIntoTable('products', productData);
       
       // Reset form
       setNewProduct({
@@ -165,7 +156,7 @@ export default function ProductsScreen() {
       await loadProducts();
       
     } catch (error) {
-      console.error('[Products] Error creating product:', error);
+      console.error('[SimpleProducts] Error creating product:', error);
       Alert.alert('Error', `Failed to create product: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -224,7 +215,7 @@ export default function ProductsScreen() {
     );
   }
 
-  if (!tursoService) {
+  if (!tursoDb) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.emptyState}>

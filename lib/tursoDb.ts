@@ -17,7 +17,7 @@ export class TursoDb {
     // Use fixed organization name "tarfw" as specified
     this.baseUrl = `https://${config.dbName}-tarfw.turso.io`;
     
-    console.log(`[TursoDb] Constructed base URL: ${this.baseUrl}`);
+    console.log(`[TursoDb] Constructed base URL: ${this.baseUrl} from dbName: ${config.dbName}`);
   }
 
   /**

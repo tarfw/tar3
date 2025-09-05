@@ -63,6 +63,7 @@ export const tursoService = {
       }
 
       const database = await response.json();
+      console.log('[Turso] Database creation response:', JSON.stringify(database, null, 2));
       
       // Get database auth token
       const authResponse = await fetch(`https://api.turso.tech/v1/databases/${dbName}/auth/tokens`, {
@@ -102,17 +103,23 @@ export const tursoService = {
       // Try different possible response structures
       if (database && database.db && database.db.url) {
         dbUrl = database.db.url; // New structure
+        console.log('[Turso] Got database URL from response (new structure):', dbUrl);
       } else if (database && database.database && database.database.dbUrl) {
         dbUrl = database.database.dbUrl; // Old structure
+        console.log('[Turso] Got database URL from response (old structure):', dbUrl);
       } else if (database && database.dbUrl) {
         dbUrl = database.dbUrl; // Direct field
+        console.log('[Turso] Got database URL from response (direct field):', dbUrl);
       } else if (database && database.hostname) {
         dbUrl = `libsql://${database.hostname}`; // Hostname field
+        console.log('[Turso] Got database URL from response (hostname field):', dbUrl);
       } else if (database && database.db && database.db.host) {
         dbUrl = `libsql://${database.db.host}`; // Host field
+        console.log('[Turso] Got database URL from response (host field):', dbUrl);
       } else {
         // Construct URL with fixed organization name "tarfw"
         dbUrl = `libsql://${dbName}-tarfw.turso.io`;
+        console.log('[Turso] Constructed database URL:', dbUrl);
       }
 
       // Validate that we have a proper database URL
