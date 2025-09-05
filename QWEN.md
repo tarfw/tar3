@@ -156,10 +156,13 @@ npx expo build
 - Consistent naming conventions
 
 ### Database Management
-- Local-first approach with SQLite
-- Automatic synchronization when online
+- Selective synchronization approach to minimize sync costs
+- Local-first approach with SQLite for user-specific data
+- Cloud access via Turso for collaborative data when needed
 - Per-user database isolation
 - Migration system for schema updates
+- Local-only tables for non-collaborative data (items, variants, etc.)
+- Cloud-accessible tables for collaborative data (notes, if needed)
 
 ## Testing
 
@@ -181,7 +184,7 @@ The application can be deployed using Expo Application Services (EAS):
 
 ### Core Context Providers
 - `contexts/AuthContext.tsx`: Authentication state management
-- `contexts/HybridDbContext.tsx`: Database integration (InstantDB + SQLite)
+- `contexts/HybridDbContext.tsx`: Selective sync database integration (InstantDB + SQLite + Turso)
 - `contexts/TursoContext.tsx`: Turso database configuration
 - `contexts/ThemeContext.tsx`: Theme management
 
@@ -190,6 +193,7 @@ The application can be deployed using Expo Application Services (EAS):
 - `lib/instantPlatformService.ts`: Instant platform API integration
 - `lib/tursoService.ts`: Turso database management
 - `lib/migrations.ts`: SQLite database migrations
+- `lib/selectiveSyncStrategy.md`: Documentation on selective sync strategy
 
 ### Main Application Screens
 - `app/_layout.tsx`: Root application layout

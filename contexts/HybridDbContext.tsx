@@ -1,4 +1,5 @@
-import { useSQLiteContext } from 'expo-sqlite';
+import { createClient } from '@libsql/client';
+import { SQLiteDatabase, useSQLiteContext } from 'expo-sqlite';
 import {
   createContext,
   ReactNode,
@@ -49,63 +50,98 @@ export interface LocalOpValue {
   value: string;
 }
 
+// Cloud data interfaces (for direct Turso access)
+export interface CloudItem extends LocalItem {}
+export interface CloudVariant extends LocalVariant {}
+export interface CloudOpGroup extends LocalOpGroup {}
+export interface CloudOpValue extends LocalOpValue {}
+
 interface HybridDbContextType {
-  // Notes
+  // Notes (selective sync - can be local or cloud)
   localNotes: LocalNote[];
   
-  // Items
+  // Items (local-only by default, cloud access when needed)
   localItems: LocalItem[];
   localVariants: LocalVariant[];
   localOpGroups: LocalOpGroup[];
   localOpValues: LocalOpValue[];
   
-  // Notes operations
+  // Cloud access methods (for all tables)
+  getCloudItems: () => Promise<CloudItem[]>;
+  getCloudVariants: () => Promise<CloudVariant[]>;
+  getCloudOpGroups: () => Promise<CloudOpGroup[]>;
+  getCloudOpValues: () => Promise<CloudOpValue[]>;
+  
+  // Cloud mutation methods
+  createCloudItem: (item: Omit<CloudItem, 'id'>) => Promise<CloudItem | null>;
+  updateCloudItem: (id: number, updates: Partial<CloudItem>) => Promise<boolean>;
+  deleteCloudItem: (id: number) => Promise<boolean>;
+  
+  // Notes operations (local)
   createNote: () => Promise<LocalNote | undefined>;
   updateNote: (id: number, updates: Partial<LocalNote>) => Promise<void>;
   deleteNote: (id: number) => Promise<void>;
   
-  // Items operations
-  createItem: (item: Omit<LocalItem, 'id'>) => Promise<LocalItem | undefined>;
-  updateItem: (id: number, updates: Partial<LocalItem>) => Promise<void>;
-  deleteItem: (id: number) => Promise<void>;
+  // Local items operations (no sync by default)
+  createLocalItem: (item: Omit<LocalItem, 'id'>) => Promise<LocalItem | undefined>;
+  updateLocalItem: (id: number, updates: Partial<LocalItem>) => Promise<void>;
+  deleteLocalItem: (id: number) => Promise<void>;
   
-  // Variants operations
-  createVariant: (variant: Omit<LocalVariant, 'id'>) => Promise<LocalVariant | undefined>;
-  updateVariant: (id: number, updates: Partial<LocalVariant>) => Promise<void>;
-  deleteVariant: (id: number) => Promise<void>;
+  // Local variants operations
+  createLocalVariant: (variant: Omit<LocalVariant, 'id'>) => Promise<LocalVariant | undefined>;
+  updateLocalVariant: (id: number, updates: Partial<LocalVariant>) => Promise<void>;
+  deleteLocalVariant: (id: number) => Promise<void>;
   
-  // Option Groups operations
-  createOpGroup: (group: Omit<LocalOpGroup, 'id'>) => Promise<LocalOpGroup | undefined>;
+  // Local option groups operations
+  createLocalOpGroup: (group: Omit<LocalOpGroup, 'id'>) => Promise<LocalOpGroup | undefined>;
   
-  // Option Values operations
-  createOpValue: (value: Omit<LocalOpValue, 'id'>) => Promise<LocalOpValue | undefined>;
+  // Local option values operations
+  createLocalOpValue: (value: Omit<LocalOpValue, 'id'>) => Promise<LocalOpValue | undefined>;
   
-  // Data getters
+  // Data getters (local)
   getAllNotes: () => LocalNote[];
   getNoteById: (id: number) => LocalNote | undefined;
   
-  // Items data getters
-  getAllItems: () => LocalItem[];
-  getItem: (id: number) => LocalItem | undefined;
-  getVariantsByItemId: (itemId: number) => LocalVariant[];
-  getAllOpGroups: () => LocalOpGroup[];
-  getOpValuesByGroupId: (groupId: number) => LocalOpValue[];
-  getAllOpValues: () => LocalOpValue[];
+  // Local data getters
+  getAllLocalItems: () => LocalItem[];
+  getLocalItem: (id: number) => LocalItem | undefined;
+  getLocalVariantsByItemId: (itemId: number) => LocalVariant[];
+  getAllLocalOpGroups: () => LocalOpGroup[];
+  getLocalOpValuesByGroupId: (groupId: number) => LocalOpValue[];
+  getAllLocalOpValues: () => LocalOpValue[];
+  
+  // Refresh methods to update local data from cloud when needed
+  refreshLocalItems: () => Promise<void>;
+  refreshLocalVariants: () => Promise<void>;
+  refreshLocalOpGroups: () => Promise<void>;
+  refreshLocalOpValues: () => Promise<void>;
 }
 
 const HybridDbContext = createContext<HybridDbContextType | null>(null);
 
 interface HybridDbProviderProps {
   children: ReactNode;
-  enableTurso?: boolean; // Allow disabling Turso if not configured
+  enableTurso?: boolean;
+  tursoUrl?: string;
+  tursoAuthToken?: string;
 }
 
-export function HybridDbProvider({ children, enableTurso = true }: HybridDbProviderProps) {
+export function HybridDbProvider({ 
+  children, 
+  enableTurso = true,
+  tursoUrl,
+  tursoAuthToken
+}: HybridDbProviderProps) {
   // Use Turso context to get configuration status
-  const { isTursoConfigured } = useTurso();
+  const { isTursoConfigured: contextTursoConfigured, tursoUrl: contextTursoUrl, tursoAuthToken: contextTursoAuthToken } = useTurso();
+  
+  // Determine actual Turso configuration
+  const isTursoConfigured = enableTurso && (contextTursoConfigured || (tursoUrl && tursoAuthToken));
+  const actualTursoUrl = tursoUrl || contextTursoUrl;
+  const actualTursoAuthToken = tursoAuthToken || contextTursoAuthToken;
   
   // SQLite context (only if Turso is enabled and configured)
-  const sqliteDb = enableTurso && isTursoConfigured ? useSQLiteContext() : null;
+  const sqliteDb = isTursoConfigured ? useSQLiteContext() : null;
   
   // Local state
   const [localNotes, setLocalNotes] = useState<LocalNote[]>([]);
@@ -121,7 +157,7 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     }
   }, [sqliteDb]);
 
-  // Fetch local data from SQLite/Turso
+  // Fetch local data from SQLite
   const fetchLocalData = useCallback(async () => {
     if (!sqliteDb) return;
     
@@ -156,7 +192,163 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     }
   }, [sqliteDb]);
 
-  // Notes operations
+  // Cloud access methods
+  const getCloudItems = useCallback(async (): Promise<CloudItem[]> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return [];
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const result = await client.execute("SELECT * FROM items ORDER BY id DESC");
+      return result.rows as CloudItem[];
+    } catch (error) {
+      console.error('Error fetching cloud items:', error);
+      return [];
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  const getCloudVariants = useCallback(async (): Promise<CloudVariant[]> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return [];
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const result = await client.execute("SELECT * FROM variants ORDER BY id DESC");
+      return result.rows as CloudVariant[];
+    } catch (error) {
+      console.error('Error fetching cloud variants:', error);
+      return [];
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  const getCloudOpGroups = useCallback(async (): Promise<CloudOpGroup[]> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return [];
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const result = await client.execute("SELECT * FROM opgroups ORDER BY id ASC");
+      return result.rows as CloudOpGroup[];
+    } catch (error) {
+      console.error('Error fetching cloud option groups:', error);
+      return [];
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  const getCloudOpValues = useCallback(async (): Promise<CloudOpValue[]> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return [];
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const result = await client.execute("SELECT * FROM opvalues ORDER BY groupId ASC, id ASC");
+      return result.rows as CloudOpValue[];
+    } catch (error) {
+      console.error('Error fetching cloud option values:', error);
+      return [];
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  // Cloud mutation methods
+  const createCloudItem = useCallback(async (itemData: Omit<CloudItem, 'id'>): Promise<CloudItem | null> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return null;
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const result = await client.execute({
+        sql: "INSERT INTO items (name, category, optionIds) VALUES (?, ?, ?) RETURNING *",
+        args: [itemData.name, itemData.category, itemData.optionIds]
+      });
+      
+      if (result.rows && result.rows.length > 0) {
+        return result.rows[0] as CloudItem;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error creating cloud item:', error);
+      return null;
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  const updateCloudItem = useCallback(async (id: number, updates: Partial<CloudItem>): Promise<boolean> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return false;
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const fields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined);
+      const setClause = fields.map(field => `${field} = ?`).join(', ');
+      const values = fields.map(field => updates[field as keyof typeof updates]);
+      
+      if (fields.length === 0) return true;
+      
+      const result = await client.execute({
+        sql: `UPDATE items SET ${setClause} WHERE id = ?`,
+        args: [...values, id]
+      });
+      
+      return result.rowsAffected > 0;
+    } catch (error) {
+      console.error('Error updating cloud item:', error);
+      return false;
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  const deleteCloudItem = useCallback(async (id: number): Promise<boolean> => {
+    if (!isTursoConfigured || !actualTursoUrl || !actualTursoAuthToken) {
+      return false;
+    }
+    
+    try {
+      const client = createClient({
+        url: actualTursoUrl,
+        authToken: actualTursoAuthToken
+      });
+      
+      const result = await client.execute({
+        sql: "DELETE FROM items WHERE id = ?",
+        args: [id]
+      });
+      
+      return result.rowsAffected > 0;
+    } catch (error) {
+      console.error('Error deleting cloud item:', error);
+      return false;
+    }
+  }, [isTursoConfigured, actualTursoUrl, actualTursoAuthToken]);
+
+  // Notes operations (local)
   const createNote = useCallback(async (): Promise<LocalNote | undefined> => {
     if (!sqliteDb) return;
     
@@ -216,8 +408,8 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     }
   }, [sqliteDb, fetchLocalData]);
 
-  // Items operations
-  const createItem = useCallback(async (itemData: Omit<LocalItem, 'id'>): Promise<LocalItem | undefined> => {
+  // Local items operations (no sync by default)
+  const createLocalItem = useCallback(async (itemData: Omit<LocalItem, 'id'>): Promise<LocalItem | undefined> => {
     if (!sqliteDb) return;
     
     try {
@@ -238,11 +430,11 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       
       return newItem;
     } catch (error) {
-      console.error('Error creating item:', error);
+      console.error('Error creating local item:', error);
     }
   }, [sqliteDb]);
 
-  const updateItem = useCallback(async (id: number, updates: Partial<LocalItem>) => {
+  const updateLocalItem = useCallback(async (id: number, updates: Partial<LocalItem>) => {
     if (!sqliteDb) return;
     
     try {
@@ -261,11 +453,11 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         item.id === id ? { ...item, ...updates } : item
       ));
     } catch (error) {
-      console.error('Error updating item:', error);
+      console.error('Error updating local item:', error);
     }
   }, [sqliteDb]);
 
-  const deleteItem = useCallback(async (id: number) => {
+  const deleteLocalItem = useCallback(async (id: number) => {
     if (!sqliteDb) return;
     
     try {
@@ -276,12 +468,12 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       setLocalItems(prev => prev.filter(item => item.id !== id));
       setLocalVariants(prev => prev.filter(variant => variant.itemId !== id));
     } catch (error) {
-      console.error('Error deleting item:', error);
+      console.error('Error deleting local item:', error);
     }
   }, [sqliteDb]);
 
-  // Variants operations
-  const createVariant = useCallback(async (variantData: Omit<LocalVariant, 'id'>): Promise<LocalVariant | undefined> => {
+  // Local variants operations
+  const createLocalVariant = useCallback(async (variantData: Omit<LocalVariant, 'id'>): Promise<LocalVariant | undefined> => {
     if (!sqliteDb) return;
     
     try {
@@ -306,11 +498,11 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       
       return newVariant;
     } catch (error) {
-      console.error('Error creating variant:', error);
+      console.error('Error creating local variant:', error);
     }
   }, [sqliteDb]);
 
-  const updateVariant = useCallback(async (id: number, updates: Partial<LocalVariant>) => {
+  const updateLocalVariant = useCallback(async (id: number, updates: Partial<LocalVariant>) => {
     if (!sqliteDb) return;
     
     try {
@@ -329,11 +521,11 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
         variant.id === id ? { ...variant, ...updates } : variant
       ));
     } catch (error) {
-      console.error('Error updating variant:', error);
+      console.error('Error updating local variant:', error);
     }
   }, [sqliteDb]);
 
-  const deleteVariant = useCallback(async (id: number) => {
+  const deleteLocalVariant = useCallback(async (id: number) => {
     if (!sqliteDb) return;
     
     try {
@@ -342,12 +534,12 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       // Update only the variants state instead of fetching all data
       setLocalVariants(prev => prev.filter(variant => variant.id !== id));
     } catch (error) {
-      console.error('Error deleting variant:', error);
+      console.error('Error deleting local variant:', error);
     }
   }, [sqliteDb]);
 
-  // Option Groups operations
-  const createOpGroup = useCallback(async (groupData: Omit<LocalOpGroup, 'id'>): Promise<LocalOpGroup | undefined> => {
+  // Local option groups operations
+  const createLocalOpGroup = useCallback(async (groupData: Omit<LocalOpGroup, 'id'>): Promise<LocalOpGroup | undefined> => {
     if (!sqliteDb) return;
     
     try {
@@ -366,12 +558,12 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       
       return newGroup;
     } catch (error) {
-      console.error('Error creating option group:', error);
+      console.error('Error creating local option group:', error);
     }
   }, [sqliteDb]);
 
-  // Option Values operations
-  const createOpValue = useCallback(async (valueData: Omit<LocalOpValue, 'id'>): Promise<LocalOpValue | undefined> => {
+  // Local option values operations
+  const createLocalOpValue = useCallback(async (valueData: Omit<LocalOpValue, 'id'>): Promise<LocalOpValue | undefined> => {
     if (!sqliteDb) return;
     
     try {
@@ -391,11 +583,121 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
       
       return newValue;
     } catch (error) {
-      console.error('Error creating option value:', error);
+      console.error('Error creating local option value:', error);
     }
   }, [sqliteDb]);
 
-  // Data getters
+  // Refresh methods to update local data from cloud when needed
+  const refreshLocalItems = useCallback(async () => {
+    if (!sqliteDb) return;
+    
+    try {
+      const cloudItems = await getCloudItems();
+      
+      // Clear local items
+      await sqliteDb.runAsync('DELETE FROM items');
+      
+      // Insert cloud items into local database
+      for (const item of cloudItems) {
+        await sqliteDb.runAsync(
+          'INSERT INTO items (id, name, category, optionIds) VALUES (?, ?, ?, ?)',
+          item.id,
+          item.name,
+          item.category,
+          item.optionIds
+        );
+      }
+      
+      // Update local state
+      setLocalItems(cloudItems);
+    } catch (error) {
+      console.error('Error refreshing local items:', error);
+    }
+  }, [sqliteDb, getCloudItems]);
+
+  const refreshLocalVariants = useCallback(async () => {
+    if (!sqliteDb) return;
+    
+    try {
+      const cloudVariants = await getCloudVariants();
+      
+      // Clear local variants
+      await sqliteDb.runAsync('DELETE FROM variants');
+      
+      // Insert cloud variants into local database
+      for (const variant of cloudVariants) {
+        await sqliteDb.runAsync(
+          'INSERT INTO variants (id, itemId, sku, barcode, price, stock, status, optionIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          variant.id,
+          variant.itemId,
+          variant.sku,
+          variant.barcode,
+          variant.price,
+          variant.stock,
+          variant.status,
+          variant.optionIds
+        );
+      }
+      
+      // Update local state
+      setLocalVariants(cloudVariants);
+    } catch (error) {
+      console.error('Error refreshing local variants:', error);
+    }
+  }, [sqliteDb, getCloudVariants]);
+
+  const refreshLocalOpGroups = useCallback(async () => {
+    if (!sqliteDb) return;
+    
+    try {
+      const cloudOpGroups = await getCloudOpGroups();
+      
+      // Clear local opgroups
+      await sqliteDb.runAsync('DELETE FROM opgroups');
+      
+      // Insert cloud opgroups into local database
+      for (const group of cloudOpGroups) {
+        await sqliteDb.runAsync(
+          'INSERT INTO opgroups (id, name) VALUES (?, ?)',
+          group.id,
+          group.name
+        );
+      }
+      
+      // Update local state
+      setLocalOpGroups(cloudOpGroups);
+    } catch (error) {
+      console.error('Error refreshing local option groups:', error);
+    }
+  }, [sqliteDb, getCloudOpGroups]);
+
+  const refreshLocalOpValues = useCallback(async () => {
+    if (!sqliteDb) return;
+    
+    try {
+      const cloudOpValues = await getCloudOpValues();
+      
+      // Clear local opvalues
+      await sqliteDb.runAsync('DELETE FROM opvalues');
+      
+      // Insert cloud opvalues into local database
+      for (const value of cloudOpValues) {
+        await sqliteDb.runAsync(
+          'INSERT INTO opvalues (id, groupId, value) VALUES (?, ?, ?)',
+          value.id,
+          value.groupId,
+          value.value
+        );
+      }
+      
+      // Update local state
+      setLocalOpValues(cloudOpValues);
+    } catch (error) {
+      console.error('Error refreshing local option values:', error);
+    }
+  }, [sqliteDb, getCloudOpValues]);
+
+  // Data getters (local)
   const getAllNotes = useCallback(() => {
     return localNotes;
   }, [localNotes]);
@@ -404,55 +706,87 @@ export function HybridDbProvider({ children, enableTurso = true }: HybridDbProvi
     return localNotes.find(note => note.id === id);
   }, [localNotes]);
 
-  const getAllItems = useCallback(() => {
+  const getAllLocalItems = useCallback(() => {
     return localItems;
   }, [localItems]);
 
-  const getItem = useCallback((id: number) => {
+  const getLocalItem = useCallback((id: number) => {
     return localItems.find(item => item.id === id);
   }, [localItems]);
 
-  const getVariantsByItemId = useCallback((itemId: number) => {
+  const getLocalVariantsByItemId = useCallback((itemId: number) => {
     return localVariants.filter(variant => variant.itemId === itemId);
   }, [localVariants]);
 
-  const getAllOpGroups = useCallback(() => {
+  const getAllLocalOpGroups = useCallback(() => {
     return localOpGroups;
   }, [localOpGroups]);
 
-  const getOpValuesByGroupId = useCallback((groupId: number) => {
+  const getLocalOpValuesByGroupId = useCallback((groupId: number) => {
     return localOpValues.filter(value => value.groupId === groupId);
   }, [localOpValues]);
 
-  const getAllOpValues = useCallback(() => {
+  const getAllLocalOpValues = useCallback(() => {
     return localOpValues;
   }, [localOpValues]);
 
   const contextValue: HybridDbContextType = {
+    // Local data
     localNotes,
     localItems,
     localVariants,
     localOpGroups,
     localOpValues,
+    
+    // Cloud access methods
+    getCloudItems,
+    getCloudVariants,
+    getCloudOpGroups,
+    getCloudOpValues,
+    
+    // Cloud mutation methods
+    createCloudItem,
+    updateCloudItem,
+    deleteCloudItem,
+    
+    // Notes operations
     createNote,
     updateNote,
     deleteNote,
-    createItem,
-    updateItem,
-    deleteItem,
-    createVariant,
-    updateVariant,
-    deleteVariant,
-    createOpGroup,
-    createOpValue,
+    
+    // Local items operations
+    createLocalItem,
+    updateLocalItem,
+    deleteLocalItem,
+    
+    // Local variants operations
+    createLocalVariant,
+    updateLocalVariant,
+    deleteLocalVariant,
+    
+    // Local option groups operations
+    createLocalOpGroup,
+    
+    // Local option values operations
+    createLocalOpValue,
+    
+    // Data getters
     getAllNotes,
     getNoteById,
-    getAllItems,
-    getItem,
-    getVariantsByItemId,
-    getAllOpGroups,
-    getOpValuesByGroupId,
-    getAllOpValues,
+    
+    // Local data getters
+    getAllLocalItems,
+    getLocalItem,
+    getLocalVariantsByItemId,
+    getAllLocalOpGroups,
+    getLocalOpValuesByGroupId,
+    getAllLocalOpValues,
+    
+    // Refresh methods
+    refreshLocalItems,
+    refreshLocalVariants,
+    refreshLocalOpGroups,
+    refreshLocalOpValues,
   };
 
   return (

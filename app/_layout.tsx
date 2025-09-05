@@ -57,7 +57,11 @@ function AppWithTurso() {
       databaseName={TURSO_DB_NAME}
       onInit={(db: SQLiteDatabase) => runMigrations(db)}
     >
-      <HybridDbProvider enableTurso={true}>
+      <HybridDbProvider 
+        enableTurso={true}
+        tursoUrl={tursoUrl}
+        tursoAuthToken={tursoAuthToken}
+      >
         <AppContent />
       </HybridDbProvider>
     </SQLiteProvider>
