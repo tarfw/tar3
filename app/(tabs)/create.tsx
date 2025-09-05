@@ -34,6 +34,12 @@ export default function CreateScreen() {
       route: '/create-order',
     },
     {
+      icon: 'tag',
+      title: 'Products',
+      color: '#10b981',
+      route: '/products',
+    },
+    {
       icon: 'folder',
       title: 'Files',
       color: '#0ea5e9',

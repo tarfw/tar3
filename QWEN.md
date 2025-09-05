@@ -13,6 +13,7 @@ This is a React Native application built with Expo, named "TAR" (likely short fo
 - **State Management**: React Context API
 - **Routing**: Expo Router with file-based routing
 - **UI Components**: React Native components with custom UI elements
+- **Turso Integration**: HTTP-based API calls to avoid Node.js specific modules
 
 ## Project Structure
 
@@ -156,10 +157,13 @@ npx expo build
 - Consistent naming conventions
 
 ### Database Management
-- Local-first approach with SQLite
-- Automatic synchronization when online
+- Selective synchronization approach to minimize sync costs
+- Local-first approach with SQLite for user-specific data
+- Cloud access via Turso using HTTP API calls (to avoid Node.js module issues)
 - Per-user database isolation
 - Migration system for schema updates
+- Local-only tables for non-collaborative data (items, variants, etc.)
+- Cloud-accessible tables for collaborative data (notes, if needed)
 
 ## Testing
 
@@ -181,15 +185,25 @@ The application can be deployed using Expo Application Services (EAS):
 
 ### Core Context Providers
 - `contexts/AuthContext.tsx`: Authentication state management
-- `contexts/HybridDbContext.tsx`: Database integration (InstantDB + SQLite)
+- `contexts/HybridDbContext.tsx`: Selective sync database integration (InstantDB + SQLite + Turso)
 - `contexts/TursoContext.tsx`: Turso database configuration
 - `contexts/ThemeContext.tsx`: Theme management
 
 ### Core Services
 - `lib/instant.ts`: InstantDB initialization
 - `lib/instantPlatformService.ts`: Instant platform API integration
-- `lib/tursoService.ts`: Turso database management
+- `lib/tursoService.ts`: Turso database management (user database creation)
+- `lib/tursoHttpService.ts`: HTTP-based Turso database interactions (React Native compatible)
 - `lib/migrations.ts`: SQLite database migrations
+- `lib/selectiveSyncStrategy.md`: Documentation on selective sync strategy
+
+### Main Application Screens
+- `app/_layout.tsx`: Root application layout
+- `app/index.tsx`: Entry point with authentication redirect
+- `app/(tabs)/_layout.tsx`: Tab navigation layout
+- `app/(auth)/`: Authentication screens
+- `app/products.tsx`: Product management screen
+- `app/tables.tsx`: Database schema management
 
 ### Main Application Screens
 - `app/_layout.tsx`: Root application layout
