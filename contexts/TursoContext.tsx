@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { tursoOptions } from './TursoConfig';
 
 interface TursoContextType {
   isTursoConfigured: boolean;
@@ -14,33 +13,14 @@ export function TursoProvider({ children }: { children: React.ReactNode }) {
   const [tursoUrl, setTursoUrl] = useState<string | undefined>(undefined);
   const [tursoAuthToken, setTursoAuthToken] = useState<string | undefined>(undefined);
 
-  // Poll for Turso configuration changes
+  // For now, we're not configuring Turso since we removed the local-first system
+  // But we keep the context structure for compatibility
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    
-    const checkTursoConfig = () => {
-      const newIsTursoConfigured = Boolean(tursoOptions.url && tursoOptions.authToken);
-      if (newIsTursoConfigured !== isTursoConfigured || 
-          tursoOptions.url !== tursoUrl || 
-          tursoOptions.authToken !== tursoAuthToken) {
-        setIsTursoConfigured(newIsTursoConfigured);
-        setTursoUrl(tursoOptions.url);
-        setTursoAuthToken(tursoOptions.authToken);
-      }
-    };
-    
-    // Check immediately
-    checkTursoConfig();
-    
-    // Check every 100ms
-    intervalId = setInterval(checkTursoConfig, 100);
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [isTursoConfigured, tursoUrl, tursoAuthToken]);
+    // Reset to unconfigured state since we removed the local-first functionality
+    setIsTursoConfigured(false);
+    setTursoUrl(undefined);
+    setTursoAuthToken(undefined);
+  }, []);
 
   return (
     <TursoContext.Provider value={{ isTursoConfigured, tursoUrl, tursoAuthToken }}>

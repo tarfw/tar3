@@ -15,10 +15,12 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { HybridDbProvider } from '@/contexts/HybridDbContext';
-import { TURSO_DB_NAME } from '@/contexts/TursoConfig';
 import { ThemeProvider, useColorScheme } from '@/contexts/ThemeContext';
 import { TursoProvider, useTurso } from '@/contexts/TursoContext';
 import { runMigrations } from '@/lib/migrations';
+
+// Turso DB Configuration
+const TURSO_DB_NAME = 'tar.db';
 
 function AppContent() {
   const colorScheme = useColorScheme();
