@@ -28,7 +28,8 @@ export class TursoDb {
    */
   async executeQuery(sql: string, params: any[] = []): Promise<any> {
     try {
-      console.log(`[TursoDb] Executing query:`, { sql, params });
+      console.log(`[TursoDb - NEW SERVICE] Executing query:`, { sql, params });
+      console.log(`[TursoDb - NEW SERVICE] Base URL: ${this.baseUrl}`);
       
       const response = await fetch(`${this.baseUrl}/v1/query`, {
         method: 'POST',
@@ -39,19 +40,19 @@ export class TursoDb {
         body: JSON.stringify({ sql, params }),
       });
 
-      console.log(`[TursoDb] Response status: ${response.status}`);
+      console.log(`[TursoDb - NEW SERVICE] Response status: ${response.status}`);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[TursoDb] HTTP error response:`, errorText);
+        console.error(`[TursoDb - NEW SERVICE] HTTP error response:`, errorText);
         throw new Error(`Turso HTTP error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log(`[TursoDb] Query result:`, JSON.stringify(result, null, 2));
+      console.log(`[TursoDb - NEW SERVICE] Query result:`, JSON.stringify(result, null, 2));
       return result;
     } catch (error) {
-      console.error('[TursoDb] Error executing query:', error);
+      console.error('[TursoDb - NEW SERVICE] Error executing query:', error);
       throw error;
     }
   }
