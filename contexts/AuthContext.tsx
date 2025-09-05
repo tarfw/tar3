@@ -187,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await db.transact([
             db.tx.app[appId].update({
               tursoDbName: tursoDbInfo.name,
+              tursoDbHostname: tursoDbInfo.httpsUrl.replace('https://', ''),
               tursoDbAuthToken: tursoDbInfo.authToken
             })
           ]);
@@ -222,8 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 // Configure Turso if we have the necessary information
                 if (updatedAppRecord.tursoDbName && updatedAppRecord.tursoDbAuthToken) {
-                  // Construct the full HTTPS URL from the database name
-                  const tursoUrl = `https://${updatedAppRecord.tursoDbName}.turso.io`;
+                  // Use the stored hostname if available, otherwise construct it
+                  const hostname = updatedAppRecord.tursoDbHostname || `${updatedAppRecord.tursoDbName}.turso.io`;
+                  const tursoUrl = `https://${hostname}`;
                   const tursoAuthToken = updatedAppRecord.tursoDbAuthToken;
                   
                   // Configure Turso context

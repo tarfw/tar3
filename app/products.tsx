@@ -55,10 +55,13 @@ export default function ProductsScreen() {
       // Log the database info for debugging
       console.log('[Products] Turso database info:', {
         dbName: userAppRecord.tursoDbName,
+        hostname: userAppRecord.tursoDbHostname,
         authToken: userAppRecord.tursoDbAuthToken ? '***' : 'missing'
       });
       
-      const dbUrl = `https://${userAppRecord.tursoDbName}.turso.io`;
+      // Use the stored hostname if available, otherwise construct it
+      const hostname = userAppRecord.tursoDbHostname || `${userAppRecord.tursoDbName}.turso.io`;
+      const dbUrl = `https://${hostname}`;
       console.log('[Products] Constructed Turso URL:', dbUrl);
       
       const service = new TursoHttpService(dbUrl, userAppRecord.tursoDbAuthToken);
