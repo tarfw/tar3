@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { useTurso } from './TursoContext';
+import { TursoHttpService } from '@/lib/tursoHttpService';
 
 // Turso DB Configuration
 const TURSO_DB_NAME = 'tar.db';
@@ -199,13 +200,10 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
-      const result = await client.execute("SELECT * FROM items ORDER BY id DESC");
-      return result.rows as CloudItem[];
+      const result = await service.executeQuery("SELECT * FROM items ORDER BY id DESC");
+      return result.results && result.results.length > 0 ? result.results[0] as CloudItem[] : [];
     } catch (error) {
       console.error('Error fetching cloud items:', error);
       return [];
@@ -218,13 +216,10 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
-      const result = await client.execute("SELECT * FROM variants ORDER BY id DESC");
-      return result.rows as CloudVariant[];
+      const result = await service.executeQuery("SELECT * FROM variants ORDER BY id DESC");
+      return result.results && result.results.length > 0 ? result.results[0] as CloudVariant[] : [];
     } catch (error) {
       console.error('Error fetching cloud variants:', error);
       return [];
@@ -237,13 +232,10 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
-      const result = await client.execute("SELECT * FROM opgroups ORDER BY id ASC");
-      return result.rows as CloudOpGroup[];
+      const result = await service.executeQuery("SELECT * FROM opgroups ORDER BY id ASC");
+      return result.results && result.results.length > 0 ? result.results[0] as CloudOpGroup[] : [];
     } catch (error) {
       console.error('Error fetching cloud option groups:', error);
       return [];
@@ -256,13 +248,10 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
-      const result = await client.execute("SELECT * FROM opvalues ORDER BY groupId ASC, id ASC");
-      return result.rows as CloudOpValue[];
+      const result = await service.executeQuery("SELECT * FROM opvalues ORDER BY groupId ASC, id ASC");
+      return result.results && result.results.length > 0 ? result.results[0] as CloudOpValue[] : [];
     } catch (error) {
       console.error('Error fetching cloud option values:', error);
       return [];
@@ -276,18 +265,15 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
-      const result = await client.execute({
+      const result = await service.executeQuery({
         sql: "INSERT INTO items (name, category, optionIds) VALUES (?, ?, ?) RETURNING *",
         args: [itemData.name, itemData.category, itemData.optionIds]
       });
       
-      if (result.rows && result.rows.length > 0) {
-        return result.rows[0] as CloudItem;
+      if (result.results && result.results.length > 0 && result.results[0].length > 0) {
+        return result.results[0][0] as CloudItem;
       }
       return null;
     } catch (error) {
@@ -302,10 +288,7 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
       const fields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined);
       const setClause = fields.map(field => `${field} = ?`).join(', ');
@@ -313,12 +296,12 @@ export function HybridDbProvider({
       
       if (fields.length === 0) return true;
       
-      const result = await client.execute({
+      const result = await service.executeQuery({
         sql: `UPDATE items SET ${setClause} WHERE id = ?`,
         args: [...values, id]
       });
       
-      return result.rowsAffected > 0;
+      return result.results && result.results.length > 0 ? result.results[0].rowsAffected > 0 : false;
     } catch (error) {
       console.error('Error updating cloud item:', error);
       return false;
@@ -331,17 +314,14 @@ export function HybridDbProvider({
     }
     
     try {
-      const client = createClient({
-        url: actualTursoUrl,
-        authToken: actualTursoAuthToken
-      });
+      const service = new TursoHttpService(actualTursoUrl, actualTursoAuthToken);
       
-      const result = await client.execute({
+      const result = await service.executeQuery({
         sql: "DELETE FROM items WHERE id = ?",
         args: [id]
       });
       
-      return result.rowsAffected > 0;
+      return result.results && result.results.length > 0 ? result.results[0].rowsAffected > 0 : false;
     } catch (error) {
       console.error('Error deleting cloud item:', error);
       return false;

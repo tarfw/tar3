@@ -229,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             // Configure Turso if we have the necessary information
             if (updatedAppRecord.tursoDbName && updatedAppRecord.tursoDbAuthToken) {
-              const tursoUrl = `libsql://${updatedAppRecord.tursoDbName}.turso.io`;
+              const tursoUrl = `https://${updatedAppRecord.tursoDbName}.turso.io`;
               const tursoAuthToken = updatedAppRecord.tursoDbAuthToken;
               
               // Configure Turso context

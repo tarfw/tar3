@@ -52,7 +52,7 @@ export default function ProductsScreen() {
   // Initialize Turso service when userAppRecord is available
   useEffect(() => {
     if (userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken) {
-      const dbUrl = `libsql://${userAppRecord.tursoDbName}.turso.io`;
+      const dbUrl = `https://${userAppRecord.tursoDbName}.turso.io`;
       const service = new TursoHttpService(dbUrl, userAppRecord.tursoDbAuthToken);
       setTursoService(service);
       
