@@ -12,12 +12,8 @@ export async function runMigrations(db: SQLiteDatabase) {
     await applyMigrations(db, currentDbVersion);
   }
 
-  // Now try to sync with remote
-  try {
-    await db.syncLibSQL();
-  } catch (e) {
-    console.log('Error syncing libSQL after migration:', e);
-  }
+  // Removed syncLibSQL call as we're removing Turso local-first functionality
+  console.log('Database migrations completed');
 }
 
 async function applyMigrations(db: SQLiteDatabase, currentDbVersion: number) {

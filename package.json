@@ -17,6 +17,7 @@
     "@expo/vector-icons": "^14.1.0",
     "@instantdb/platform": "^0.21.0",
     "@instantdb/react-native": "^0.20.23",
+    "@libsql/client": "^0.15.14",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/bottom-tabs": "^7.3.10",

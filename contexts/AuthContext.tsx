@@ -8,6 +8,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 type AuthContextType = {
   user: any;
   userApp: any | null;
+  userAppRecord: any | null;
   isLoading: boolean;
   error: any;
   signOut: () => Promise<void>;
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const [userApp, setUserApp] = useState<any | null>(null);
+  const [userAppRecord, setUserAppRecord] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const initializationRef = useRef<{ userId?: string; promise?: Promise<void> }>({});
 
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else if (!user?.id) {
       // Reset state when user logs out
       setUserApp(null);
+      setUserAppRecord(null);
     }
   }, [user?.id, userApp]);
 
@@ -85,13 +88,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log(`Initializing app for user ${userId} with email: ${userEmail}`);
       
       // Check if user already has an app
-      const existingApp = await findUserApp(userId);
+      const existingAppRecord = await findUserApp(userId);
       
-      if (existingApp?.appid) {
-        console.log(`Found existing app for user ${userId}: ${existingApp.appid}`);
+      if (existingAppRecord?.appid) {
+        console.log(`Found existing app for user ${userId}: ${existingAppRecord.appid}`);
         // Load existing app
-        const app = await loadExistingApp(existingApp.appid);
+        const app = await loadExistingApp(existingAppRecord.appid);
         setUserApp(app);
+        setUserAppRecord(existingAppRecord);
       } else {
         console.log(`No existing app found for user ${userId}, creating new app`);
         // Create new app for user
@@ -115,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         app.$users?.some(u => u.id === userId)
       );
     } catch (error) {
-      console.error('Error finding user app:', error);
+      console.error('[AuthContext] Error finding user app:', error);
       return null;
     }
   };
@@ -163,10 +167,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       console.log(`✓ Created InstantDB app ${newApp.id} for user ${userId}`);
 
+      let appId;
       // Link to user in foundation DB
       try {
         console.log(`Linking app ${newApp.id} to user ${userId}`);
-        const appId = id();
+        appId = id();
         await db.transact([
           db.tx.app[appId].update({
             appid: newApp.id
@@ -179,26 +184,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Create Turso database for the user (keeping only this part)
       try {
-        console.log(`Creating Turso database for user ${userId} with email: ${userEmail}`);
+        console.log(`[Step 4] Creating Turso database for user ${userId} with email: ${userEmail}`);
         const { tursoService } = await import('@/lib/tursoService');
         const tursoDbInfo = await tursoService.createUserDatabase(userId, userEmail);
+        console.log(`[Step 4] Turso database created successfully`);
         
-        // Store Turso database info in InstantDB
-        if (tursoDbInfo) {
+        // Store Turso database info in InstantDB (in the same entity that links to the user)
+        if (tursoDbInfo && appId) {
+          console.log(`[Step 5] Storing Turso database info in InstantDB`);
+          console.log(`[Step 5] Data - Name: ${tursoDbInfo.name}, AuthToken present: ${!!tursoDbInfo.authToken}`);
+          
+          // Execute the transaction
           await db.transact([
-            db.tx.app[newApp.id].update({
+            db.tx.app[appId].update({
               tursoDbName: tursoDbInfo.name,
               tursoDbAuthToken: tursoDbInfo.authToken
             })
           ]);
+          console.log(`[Step 5] Transaction executed successfully`);
+          
+          // Verify the data was stored
+          try {
+            const { data } = await db.queryOnce({
+              app: {
+                $: { where: { id: appId } }
+              }
+            });
+            const storedApp = data?.app?.find(a => a.id === appId);
+            console.log(`[Step 5] Verification - dbName: ${storedApp?.tursoDbName}, authToken present: ${!!storedApp?.tursoDbAuthToken}`);
+          } catch (verifyError) {
+            console.warn(`[Step 5] Could not verify stored data:`, verifyError);
+          }
+          
+          console.log(`[Step 5] ✓ Completed storing Turso database info`);
         }
         
-        console.log('✓ Created Turso database for user');
+        console.log(`[Step 4-5] ✓ Completed Turso database creation and storage`);
       } catch (tursoError) {
-        console.warn('Failed to create Turso database:', tursoError);
+        console.error(`[Step 4-5] Failed to create/store Turso database:`, tursoError);
       }
 
       setUserApp(newApp);
+      if (appId) {
+        // Refresh the app record to include Turso information
+        try {
+          const { data } = await db.queryOnce({
+            app: {
+              $: { where: { id: appId } },
+              $users: {}
+            }
+          });
+          
+          const updatedAppRecord = data?.app?.find(app => app.id === appId);
+          if (updatedAppRecord) {
+            setUserAppRecord(updatedAppRecord);
+          }
+        } catch (refreshError) {
+          console.warn('[AuthContext] Failed to refresh app record:', refreshError);
+        }
+      }
       console.log('✓ Created new app for user');
     } catch (error) {
       console.error('Error creating new app for user:', error);
@@ -207,11 +251,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUserApp = useCallback(async () => {
-    if (user?.id && userApp?.id) {
+    if (user?.id) {
       try {
-        const refreshedApp = await loadExistingApp(userApp.id);
-        if (refreshedApp) {
-          setUserApp(refreshedApp);
+        // Refresh the user app record (which contains Turso info)
+        const refreshedAppRecord = await findUserApp(user.id);
+        if (refreshedAppRecord) {
+          setUserAppRecord(refreshedAppRecord);
+          
+          // Refresh the platform app if we have an appid
+          if (refreshedAppRecord.appid && userApp?.id) {
+            const refreshedApp = await loadExistingApp(userApp.id);
+            if (refreshedApp) {
+              setUserApp(refreshedApp);
+            }
+          }
         }
       } catch (error) {
         console.error('Error refreshing user app:', error);
@@ -256,6 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ 
       user, 
       userApp,
+      userAppRecord,
       isLoading: authLoading || isLoading,
       error, 
       signOut,

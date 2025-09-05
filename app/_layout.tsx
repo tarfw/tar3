@@ -49,15 +49,10 @@ function AppContent() {
 function AppWithTurso() {
   const { isTursoConfigured, tursoUrl, tursoAuthToken } = useTurso();
   
+  // Simplified SQLite provider without libsql sync features
   return isTursoConfigured && tursoUrl && tursoAuthToken ? (
     <SQLiteProvider
       databaseName={TURSO_DB_NAME}
-      options={{
-        libSQLOptions: {
-          url: tursoUrl,
-          authToken: tursoAuthToken,
-        },
-      }}
       onInit={(db: SQLiteDatabase) => runMigrations(db)}
     >
       <HybridDbProvider enableTurso={true}>
