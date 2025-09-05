@@ -205,12 +205,6 @@ The application can be deployed using Expo Application Services (EAS):
 - `app/products.tsx`: Product management screen
 - `app/tables.tsx`: Database schema management
 
-### Main Application Screens
-- `app/_layout.tsx`: Root application layout
-- `app/index.tsx`: Entry point with authentication redirect
-- `app/(tabs)/_layout.tsx`: Tab navigation layout
-- `app/(auth)/`: Authentication screens
-
 ## Troubleshooting
 
 ### Common Issues
