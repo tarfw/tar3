@@ -85,19 +85,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const performAppInitialization = async (userId: string, userEmail?: string) => {
     try {
-      console.log(`Initializing app for user ${userId} with email: ${userEmail}`);
-      
+      // Reduced logging - only log essential information
       // Check if user already has an app
       const existingAppRecord = await findUserApp(userId);
       
       if (existingAppRecord?.appid) {
-        console.log(`Found existing app for user ${userId}: ${existingAppRecord.appid}`);
         // Load existing app
         const app = await loadExistingApp(existingAppRecord.appid);
         setUserApp(app);
         setUserAppRecord(existingAppRecord);
       } else {
-        console.log(`No existing app found for user ${userId}, creating new app`);
         // Create new app for user
         await createNewAppForUser(userId, userEmail);
       }
@@ -146,8 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const createNewAppForUser = async (userId: string, userEmail?: string) => {
     try {
-      console.log(`Creating new app for user ${userId} with email: ${userEmail}`);
-      
+      // Reduced logging - only essential messages
       // Initialize platform service
       const platformToken = process.env.EXPO_PUBLIC_INSTANT_PLATFORM_TOKEN;
       if (!platformToken) {
@@ -159,41 +155,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Create app with default template
-      console.log(`Creating InstantDB app for user ${userId} (${userEmail})`);
       const newApp = await instantPlatformService.createApp({
         title: userEmail?.split('@')[0] || 'User',
         schema: InstantPlatformService.createBasicTodoSchema(),
         perms: InstantPlatformService.createBasicTodoPermissions(),
       });
-      console.log(`✓ Created InstantDB app ${newApp.id} for user ${userId}`);
 
       let appId;
       // Link to user in foundation DB
       try {
-        console.log(`Linking app ${newApp.id} to user ${userId}`);
         appId = id();
         await db.transact([
           db.tx.app[appId].update({
             appid: newApp.id
           }).link({ $users: userId })
         ]);
-        console.log(`✓ Linked app ${newApp.id} to user ${userId} with entity ID ${appId}`);
       } catch (linkError) {
         console.warn('Failed to link app to foundation DB:', linkError);
       }
 
       // Create Turso database for the user (keeping only this part)
       try {
-        console.log(`[Step 4] Creating Turso database for user ${userId} with email: ${userEmail}`);
+        console.log(`[Auth] Creating Turso database for user ${userId}`);
         const { tursoService } = await import('@/lib/tursoService');
         const tursoDbInfo = await tursoService.createUserDatabase(userId, userEmail);
-        console.log(`[Step 4] Turso database created successfully`);
+        console.log(`[Auth] Turso database created successfully for user ${userId}`);
         
         // Store Turso database info in InstantDB (in the same entity that links to the user)
         if (tursoDbInfo && appId) {
-          console.log(`[Step 5] Storing Turso database info in InstantDB`);
-          console.log(`[Step 5] Data - Name: ${tursoDbInfo.name}, AuthToken present: ${!!tursoDbInfo.authToken}`);
-          
           // Execute the transaction
           await db.transact([
             db.tx.app[appId].update({
@@ -201,7 +190,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               tursoDbAuthToken: tursoDbInfo.authToken
             })
           ]);
-          console.log(`[Step 5] Transaction executed successfully`);
           
           // Verify the data was stored
           try {
@@ -211,12 +199,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             });
             const storedApp = data?.app?.find(a => a.id === appId);
-            console.log(`[Step 5] Verification - dbName: ${storedApp?.tursoDbName}, authToken present: ${!!storedApp?.tursoDbAuthToken}`);
+            if (storedApp?.tursoDbName && storedApp?.tursoDbAuthToken) {
+              console.log(`[Auth] Turso database info stored successfully for user ${userId}`);
+            }
           } catch (verifyError) {
-            console.warn(`[Step 5] Could not verify stored data:`, verifyError);
+            console.warn(`[Auth] Could not verify stored data:`, verifyError);
           }
-          
-          console.log(`[Step 5] ✓ Completed storing Turso database info`);
         }
         
         console.log(`[Step 4-5] ✓ Completed Turso database creation and storage`);
@@ -243,7 +231,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn('[AuthContext] Failed to refresh app record:', refreshError);
         }
       }
-      console.log('✓ Created new app for user');
+      // Reduced logging - only log success
+      // console.log('✓ Created new app for user');
     } catch (error) {
       console.error('Error creating new app for user:', error);
       throw error;
@@ -278,7 +267,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await AsyncStorage.removeItem(getUserAppCacheKey(targetUserId));
         await AsyncStorage.removeItem(getUserAppIdCacheKey(targetUserId));
-        console.log('Cleared app cache for user:', targetUserId);
+        // Reduced logging - only log in debug mode
+        // console.log('Cleared app cache for user:', targetUserId);
       } catch (error) {
         console.error('Error clearing app cache:', error);
       }
