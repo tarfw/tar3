@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "tar3",
-    "slug": "tar3",
+    "name": "tar",
+    "slug": "tar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tar3",
+    "scheme": "tar",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
@@ -16,7 +16,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.tarthamizh.tar3"
+      "package": "com.tarthamizh.tar"
     },
     "web": {
       "bundler": "metro",
