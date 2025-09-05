@@ -98,18 +98,40 @@ export default function SimpleProductsScreen() {
       
       console.log('[SimpleProducts] Products query result:', JSON.stringify(result, null, 2));
       
+      // Handle the new response format from Turso v2 API
       if (result && result.results && result.results.length > 0) {
-        const productsData = result.results[0].map((row: any) => ({
-          id: row[0],
-          name: row[1],
-          description: row[2],
-          price: row[3],
-          category: row[4],
-          stock: row[5],
-          created_at: row[6],
-        }));
-        setProducts(productsData);
-        console.log('[SimpleProducts] Loaded products:', productsData.length);
+        // The first result should be the execute response
+        const executeResult = result.results[0];
+        if (executeResult && executeResult.type === 'ok' && executeResult.response && executeResult.response.result) {
+          const rows = executeResult.response.result.rows || [];
+          const cols = executeResult.response.result.cols || [];
+          
+          console.log('[SimpleProducts] Rows:', rows);
+          console.log('[SimpleProducts] Cols:', cols);
+          
+          // Convert rows to objects using column names
+          const productsData = rows.map((row: any) => {
+            const product: any = {};
+            cols.forEach((col: any, index: number) => {
+              product[col.name] = row[index];
+            });
+            return product;
+          }).map((row: any) => ({
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            price: row.price,
+            category: row.category,
+            stock: row.stock,
+            created_at: row.created_at,
+          }));
+          
+          setProducts(productsData);
+          console.log('[SimpleProducts] Loaded products:', productsData.length);
+        } else {
+          setProducts([]);
+          console.log('[SimpleProducts] No products found in response');
+        }
       } else {
         setProducts([]);
         console.log('[SimpleProducts] No products found');

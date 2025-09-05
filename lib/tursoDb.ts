@@ -31,13 +31,43 @@ export class TursoDb {
       console.log(`[TursoDb - NEW SERVICE] Executing query:`, { sql, params });
       console.log(`[TursoDb - NEW SERVICE] Base URL: ${this.baseUrl}`);
       
-      const response = await fetch(`${this.baseUrl}/v1/query`, {
+      // Convert parameters to the correct format for Turso
+      const formattedParams = params.map(param => {
+        if (param === null) {
+          return { type: "null" };
+        } else if (typeof param === "number") {
+          if (Number.isInteger(param)) {
+            return { type: "integer", value: param.toString() };
+          } else {
+            return { type: "float", value: param.toString() };
+          }
+        } else {
+          return { type: "text", value: String(param) };
+        }
+      });
+      
+      const requestBody = {
+        requests: [
+          {
+            type: "execute",
+            stmt: {
+              sql: sql,
+              args: formattedParams
+            }
+          },
+          {
+            type: "close"
+          }
+        ]
+      };
+      
+      const response = await fetch(`${this.baseUrl}/v2/pipeline`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.authToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ sql, params }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log(`[TursoDb - NEW SERVICE] Response status: ${response.status}`);
