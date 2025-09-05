@@ -215,34 +215,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserApp(newApp);
       if (appId) {
         // Refresh the app record to include Turso information
-        try {
-          const { data } = await db.queryOnce({
-            app: {
-              $: { where: { id: appId } },
-              $users: {}
-            }
-          });
-          
-          const updatedAppRecord = data?.app?.find(app => app.id === appId);
-          if (updatedAppRecord) {
-            setUserAppRecord(updatedAppRecord);
-            
-            // Configure Turso if we have the necessary information
-            if (updatedAppRecord.tursoDbName && updatedAppRecord.tursoDbAuthToken) {
-              const tursoUrl = `https://${updatedAppRecord.tursoDbName}.turso.io`;
-              const tursoAuthToken = updatedAppRecord.tursoDbAuthToken;
-              
-              // Configure Turso context
-              const { configureTurso } = require('./TursoContext').useTurso();
-              try {
-                configureTurso(tursoUrl, tursoAuthToken);
-                console.log(`[Auth] Turso configured successfully for user ${userId}`);
-              } catch (configError) {
-                console.error('[Auth] Failed to configure Turso context:', configError);
+            try {
+              const updatedAppRecord = data?.app?.find(app => app.id === appId);
+              if (updatedAppRecord) {
+                setUserAppRecord(updatedAppRecord);
+                
+                // Configure Turso if we have the necessary information
+                if (updatedAppRecord.tursoDbName && updatedAppRecord.tursoDbAuthToken) {
+                  // Construct the full HTTPS URL from the database name
+                  const tursoUrl = `https://${updatedAppRecord.tursoDbName}.turso.io`;
+                  const tursoAuthToken = updatedAppRecord.tursoDbAuthToken;
+                  
+                  // Configure Turso context
+                  const { configureTurso } = require('./TursoContext').useTurso();
+                  try {
+                    configureTurso(tursoUrl, tursoAuthToken);
+                    console.log(`[Auth] Turso configured successfully for user ${userId}`);
+                  } catch (configError) {
+                    console.error('[Auth] Failed to configure Turso context:', configError);
+                  }
+                }
               }
-            }
-          }
-        } catch (refreshError) {
+            } catch (refreshError) {
           console.warn('[AuthContext] Failed to refresh app record:', refreshError);
         }
       }

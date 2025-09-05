@@ -52,12 +52,25 @@ export default function ProductsScreen() {
   // Initialize Turso service when userAppRecord is available
   useEffect(() => {
     if (userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken) {
+      // Log the database info for debugging
+      console.log('[Products] Turso database info:', {
+        dbName: userAppRecord.tursoDbName,
+        authToken: userAppRecord.tursoDbAuthToken ? '***' : 'missing'
+      });
+      
       const dbUrl = `https://${userAppRecord.tursoDbName}.turso.io`;
+      console.log('[Products] Constructed Turso URL:', dbUrl);
+      
       const service = new TursoHttpService(dbUrl, userAppRecord.tursoDbAuthToken);
       setTursoService(service);
       
       // Create products table if it doesn't exist
       createProductsTable(service);
+    } else {
+      console.log('[Products] Missing Turso database info:', {
+        hasDbName: !!userAppRecord?.tursoDbName,
+        hasAuthToken: !!userAppRecord?.tursoDbAuthToken
+      });
     }
   }, [userAppRecord]);
 
