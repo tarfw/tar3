@@ -140,7 +140,13 @@ export default function SimpleProductsScreen() {
               cols.forEach((col: any, index: number) => {
                 // Ensure col has a name property
                 if (col && col.name) {
-                  product[col.name] = row[index];
+                  // Extract the actual value from the typed value object
+                  const typedValue = row[index];
+                  if (typedValue && typeof typedValue === 'object' && typedValue.hasOwnProperty('value')) {
+                    product[col.name] = typedValue.value;
+                  } else {
+                    product[col.name] = typedValue;
+                  }
                 } else {
                   console.warn(`[SimpleProducts] Invalid column at index ${index}:`, col);
                 }
@@ -153,15 +159,36 @@ export default function SimpleProductsScreen() {
             console.log(`[SimpleProducts] Mapping row ${index} to product:`, JSON.stringify(row, null, 2));
             
             return {
-              id: (row.id !== undefined && row.id !== null) ? (typeof row.id === 'string' ? parseInt(row.id) || 0 : row.id) : 0,
-              name: (row.name !== undefined && row.name !== null) ? String(row.name) : '',
-              description: (row.description !== undefined && row.description !== null) ? String(row.description) : null,
+              id: (row.id !== undefined && row.id !== null) ? 
+                (typeof row.id === 'object' && row.id.hasOwnProperty('value') ? 
+                  (parseInt(row.id.value) || 0) : 
+                  (typeof row.id === 'string' ? parseInt(row.id) || 0 : row.id || 0)) : 0,
+              name: (row.name !== undefined && row.name !== null) ? 
+                (typeof row.name === 'object' && row.name.hasOwnProperty('value') ? 
+                  String(row.name.value) : 
+                  String(row.name)) : '',
+              description: (row.description !== undefined && row.description !== null) ? 
+                (typeof row.description === 'object' && row.description.hasOwnProperty('value') ? 
+                  String(row.description.value) : 
+                  String(row.description)) : null,
               price: (row.price !== undefined && row.price !== null) ? 
-                (typeof row.price === 'string' ? parseFloat(row.price) || 0 : typeof row.price === 'number' ? row.price : 0) : 0,
-              category: (row.category !== undefined && row.category !== null) ? String(row.category) : null,
+                (typeof row.price === 'object' && row.price.hasOwnProperty('value') ? 
+                  (parseFloat(row.price.value) || 0) : 
+                  (typeof row.price === 'string' ? parseFloat(row.price) || 0 : 
+                    typeof row.price === 'number' ? row.price : 0)) : 0,
+              category: (row.category !== undefined && row.category !== null) ? 
+                (typeof row.category === 'object' && row.category.hasOwnProperty('value') ? 
+                  String(row.category.value) : 
+                  String(row.category)) : null,
               stock: (row.stock !== undefined && row.stock !== null) ? 
-                (typeof row.stock === 'string' ? parseInt(row.stock) || 0 : typeof row.stock === 'number' ? row.stock : 0) : 0,
-              created_at: (row.created_at !== undefined && row.created_at !== null) ? String(row.created_at) : null,
+                (typeof row.stock === 'object' && row.stock.hasOwnProperty('value') ? 
+                  (parseInt(row.stock.value) || 0) : 
+                  (typeof row.stock === 'string' ? parseInt(row.stock) || 0 : 
+                    typeof row.stock === 'number' ? row.stock : 0)) : 0,
+              created_at: (row.created_at !== undefined && row.created_at !== null) ? 
+                (typeof row.created_at === 'object' && row.created_at.hasOwnProperty('value') ? 
+                  String(row.created_at.value) : 
+                  String(row.created_at)) : null,
             };
           });
           
