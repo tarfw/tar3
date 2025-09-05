@@ -19,14 +19,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { TursoDb, useTursoDb } from '@/lib/tursoDb';
 
-interface Product {
+export interface Product {
   id: number;
   name: string;
-  description: string;
+  description: string | null;
   price: number;
-  category: string;
+  category: string | null;
   stock: number;
-  created_at: string;
+  created_at: string | null;
 }
 
 export default function SimpleProductsScreen() {
@@ -117,13 +117,13 @@ export default function SimpleProductsScreen() {
             });
             return product;
           }).map((row: any) => ({
-            id: row.id,
-            name: row.name,
-            description: row.description,
-            price: row.price,
-            category: row.category,
-            stock: row.stock,
-            created_at: row.created_at,
+            id: row.id || 0,
+            name: row.name || '',
+            description: row.description || null,
+            price: typeof row.price === 'string' ? parseFloat(row.price) || 0 : row.price || 0,
+            category: row.category || null,
+            stock: typeof row.stock === 'string' ? parseInt(row.stock) || 0 : row.stock || 0,
+            created_at: row.created_at || null,
           }));
           
           setProducts(productsData);
@@ -153,9 +153,9 @@ export default function SimpleProductsScreen() {
       const productData = {
         name: newProduct.name,
         description: newProduct.description || '',
-        price: parseFloat(newProduct.price) || 0,
+        price: newProduct.price ? parseFloat(newProduct.price) || 0 : 0,
         category: newProduct.category || '',
-        stock: parseInt(newProduct.stock) || 0,
+        stock: newProduct.stock ? parseInt(newProduct.stock) || 0 : 0,
       };
       
       console.log('[SimpleProducts] Creating product:', productData);
@@ -192,7 +192,9 @@ export default function SimpleProductsScreen() {
     >
       <View style={styles.productHeader}>
         <Text style={[styles.productName, { color: colors.text }]}>{product.name}</Text>
-        <Text style={[styles.productPrice, { color: colors.primary }]}>${product.price.toFixed(2)}</Text>
+        <Text style={[styles.productPrice, { color: colors.primary }]}>
+          ${typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+        </Text>
       </View>
       {product.description ? (
         <Text style={[styles.productDescription, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -206,7 +208,7 @@ export default function SimpleProductsScreen() {
           </Text>
         ) : null}
         <Text style={[styles.productStock, { color: colors.textSecondary }]}>
-          Stock: {product.stock}
+          Stock: {typeof product.stock === 'number' ? product.stock : 0}
         </Text>
       </View>
     </View>
