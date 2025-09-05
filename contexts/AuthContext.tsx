@@ -188,7 +188,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             db.tx.app[appId].update({
               tursoDbName: tursoDbInfo.name,
               tursoDbHostname: tursoDbInfo.httpsUrl.replace('https://', ''),
-              tursoDbOrgName: tursoDbInfo.orgName,
               tursoDbAuthToken: tursoDbInfo.authToken
             })
           ]);
@@ -224,17 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 // Configure Turso if we have the necessary information
                 if (updatedAppRecord.tursoDbName && updatedAppRecord.tursoDbAuthToken) {
-                  // Use the stored hostname if available, otherwise construct it
-                  let tursoUrl;
-                  if (updatedAppRecord.tursoDbHostname) {
-                    tursoUrl = `https://${updatedAppRecord.tursoDbHostname}`;
-                  } else if (updatedAppRecord.tursoDbOrgName) {
-                    // Use org name if available
-                    tursoUrl = `https://${updatedAppRecord.tursoDbName}-${updatedAppRecord.tursoDbOrgName}.turso.io`;
-                  } else {
-                    // Fallback to just database name
-                    tursoUrl = `https://${updatedAppRecord.tursoDbName}.turso.io`;
-                  }
+                  // Use the stored hostname if available, otherwise construct it with fixed org name
+                  const hostname = updatedAppRecord.tursoDbHostname || `${updatedAppRecord.tursoDbName}-tarfw.turso.io`;
+                  const tursoUrl = `https://${hostname}`;
                   const tursoAuthToken = updatedAppRecord.tursoDbAuthToken;
                   
                   // Configure Turso context

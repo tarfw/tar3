@@ -14,14 +14,8 @@ export class TursoDb {
   constructor(config: TursoDbConfig) {
     this.config = config;
     
-    // According to Turso docs, the URL format is: https://{db-name}-{org-name}.turso.io
-    // But we need to handle cases where org name might not be needed
-    if (config.orgName) {
-      this.baseUrl = `https://${config.dbName}-${config.orgName}.turso.io`;
-    } else {
-      // Fallback to just database name
-      this.baseUrl = `https://${config.dbName}.turso.io`;
-    }
+    // Use fixed organization name "tarfw" as specified
+    this.baseUrl = `https://${config.dbName}-tarfw.turso.io`;
     
     console.log(`[TursoDb] Constructed base URL: ${this.baseUrl}`);
   }

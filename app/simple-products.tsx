@@ -50,8 +50,7 @@ export default function SimpleProductsScreen() {
   const tursoConfig = userAppRecord?.tursoDbName && userAppRecord?.tursoDbAuthToken
     ? {
         dbName: userAppRecord.tursoDbName,
-        authToken: userAppRecord.tursoDbAuthToken,
-        orgName: userAppRecord.tursoDbOrgName
+        authToken: userAppRecord.tursoDbAuthToken
       }
     : null;
   
