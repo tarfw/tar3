@@ -145,6 +145,35 @@ export class TursoDb {
       throw error;
     }
   }
+
+  /**
+   * Update data in a table
+   * @param tableName The name of the table to update
+   * @param data Object containing the column names and values to update
+   * @param conditions WHERE conditions to specify which rows to update
+   * @param params Optional parameters for the WHERE conditions
+   * @returns The result of the update
+   */
+  async updateTable(tableName: string, data: Record<string, any>, conditions?: string, params: any[] = []): Promise<any> {
+    try {
+      const columns = Object.keys(data);
+      const values = Object.values(data);
+      const setClause = columns.map(col => `${col} = ?`).join(', ');
+      
+      let sql = `UPDATE ${tableName} SET ${setClause}`;
+      
+      if (conditions) {
+        sql += ` WHERE ${conditions}`;
+        // Add condition parameters to the values array
+        values.push(...params);
+      }
+      
+      return await this.executeQuery(sql, values);
+    } catch (error) {
+      console.error(`[TursoDb] Error updating table ${tableName}:`, error);
+      throw error;
+    }
+  }
 }
 
 // Hook for React Native usage

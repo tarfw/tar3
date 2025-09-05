@@ -1,6 +1,6 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
-import { Spacing, TextStyles } from '@/constants/Typography';
+import { Radius, Shadow, Spacing, TextStyles } from '@/constants/Typography';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { router } from 'expo-router';
 import React, { useState, useEffect } from 'react';
@@ -14,10 +14,12 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { TursoDb, useTursoDb } from '@/lib/tursoDb';
+import { TursoDb } from '@/lib/tursoDb';
 
 export interface Product {
   id: number;
@@ -29,7 +31,7 @@ export interface Product {
   created_at: string | null;
 }
 
-export default function SimpleProductsScreen() {
+export default function ProductsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user, userAppRecord } = useAuth();
@@ -38,7 +40,17 @@ export default function SimpleProductsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [newProduct, setNewProduct] = useState({
+    name: '',
+    description: '',
+    price: '',
+    category: '',
+    stock: '',
+  });
+  const [editProduct, setEditProduct] = useState({
+    id: 0,
     name: '',
     description: '',
     price: '',
@@ -65,7 +77,7 @@ export default function SimpleProductsScreen() {
     });
     
     try {
-      console.log('[SimpleProducts] Creating products table');
+      console.log('[Products] Creating products table');
       await tursoDb.createTable('products', `
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -75,9 +87,9 @@ export default function SimpleProductsScreen() {
         stock INTEGER NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       `);
-      console.log('[SimpleProducts] Products table created successfully');
+      console.log('[Products] Products table created successfully');
     } catch (error) {
-      console.error('[SimpleProducts] Error creating products table:', error);
+      console.error('[Products] Error creating products table:', error);
     }
   };
 
@@ -99,40 +111,40 @@ export default function SimpleProductsScreen() {
       // Create table if it doesn't exist
       await createProductsTable();
       
-      console.log('[SimpleProducts] Loading products');
+      console.log('[Products] Loading products');
       const result = await tursoDb.selectFromTable('products', '1=1 ORDER BY created_at DESC');
       
-      console.log('[SimpleProducts] Products query result:', JSON.stringify(result, null, 2));
+      console.log('[Products] Products query result:', JSON.stringify(result, null, 2));
       
       // Handle the new response format from Turso v2 API
       if (result && result.results && result.results.length > 0) {
         // The first result should be the execute response
         const executeResult = result.results[0];
-        console.log('[SimpleProducts] Execute result:', JSON.stringify(executeResult, null, 2));
+        console.log('[Products] Execute result:', JSON.stringify(executeResult, null, 2));
         
         if (executeResult && executeResult.type === 'ok' && executeResult.response && executeResult.response.result) {
           const rows = executeResult.response.result.rows || [];
           const cols = executeResult.response.result.cols || [];
           
-          console.log('[SimpleProducts] Rows:', JSON.stringify(rows, null, 2));
-          console.log('[SimpleProducts] Cols:', JSON.stringify(cols, null, 2));
+          console.log('[Products] Rows:', JSON.stringify(rows, null, 2));
+          console.log('[Products] Cols:', JSON.stringify(cols, null, 2));
           
           // Check if rows and cols are valid arrays
           if (!Array.isArray(rows)) {
-            console.error('[SimpleProducts] Rows is not an array:', typeof rows);
+            console.error('[Products] Rows is not an array:', typeof rows);
             setProducts([]);
             return;
           }
           
           if (!Array.isArray(cols)) {
-            console.error('[SimpleProducts] Cols is not an array:', typeof cols);
+            console.error('[Products] Cols is not an array:', typeof cols);
             setProducts([]);
             return;
           }
           
           // Convert rows to objects using column names
           const productsData = rows.map((row: any, rowIndex: number) => {
-            console.log(`[SimpleProducts] Processing row ${rowIndex}:`, JSON.stringify(row, null, 2));
+            console.log(`[Products] Processing row ${rowIndex}:`, JSON.stringify(row, null, 2));
             
             const product: any = {};
             // Ensure cols is an array and row is an array
@@ -148,15 +160,15 @@ export default function SimpleProductsScreen() {
                     product[col.name] = typedValue;
                   }
                 } else {
-                  console.warn(`[SimpleProducts] Invalid column at index ${index}:`, col);
+                  console.warn(`[Products] Invalid column at index ${index}:`, col);
                 }
               });
             } else {
-              console.warn(`[SimpleProducts] Invalid cols or row at index ${rowIndex}`, { colsType: typeof cols, rowType: typeof row });
+              console.warn(`[Products] Invalid cols or row at index ${rowIndex}`, { colsType: typeof cols, rowType: typeof row });
             }
             return product;
           }).map((row: any, index: number) => {
-            console.log(`[SimpleProducts] Mapping row ${index} to product:`, JSON.stringify(row, null, 2));
+            console.log(`[Products] Mapping row ${index} to product:`, JSON.stringify(row, null, 2));
             
             return {
               id: (row.id !== undefined && row.id !== null) ? 
@@ -192,19 +204,19 @@ export default function SimpleProductsScreen() {
             };
           });
           
-          console.log('[SimpleProducts] Final products data:', JSON.stringify(productsData, null, 2));
+          console.log('[Products] Final products data:', JSON.stringify(productsData, null, 2));
           setProducts(productsData);
-          console.log('[SimpleProducts] Loaded products:', productsData.length);
+          console.log('[Products] Loaded products:', productsData.length);
         } else {
           setProducts([]);
-          console.log('[SimpleProducts] No products found in response');
+          console.log('[Products] No products found in response');
         }
       } else {
         setProducts([]);
-        console.log('[SimpleProducts] No products found');
+        console.log('[Products] No products found');
       }
     } catch (error) {
-      console.error('[SimpleProducts] Error loading products:', error);
+      console.error('[Products] Error loading products:', error);
       Alert.alert('Error', 'Failed to load products');
     } finally {
       setIsLoading(false);
@@ -233,10 +245,10 @@ export default function SimpleProductsScreen() {
         stock: newProduct.stock ? parseInt(newProduct.stock) || 0 : 0,
       };
       
-      console.log('[SimpleProducts] Creating product:', productData);
+      console.log('[Products] Creating product:', productData);
       await tursoDb.insertIntoTable('products', productData);
       
-      // Reset form
+      // Reset create form
       setNewProduct({
         name: '',
         description: '',
@@ -253,8 +265,58 @@ export default function SimpleProductsScreen() {
       await loadProducts();
       
     } catch (error) {
-      console.error('[SimpleProducts] Error creating product:', error);
+      console.error('[Products] Error creating product:', error);
       Alert.alert('Error', `Failed to create product: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    // Create Turso database instance
+    if (!userAppRecord?.tursoDbName || !userAppRecord?.tursoDbAuthToken || !editProduct.name.trim() || !selectedProduct) {
+      return;
+    }
+    
+    const tursoDb = new TursoDb({
+      dbName: userAppRecord.tursoDbName,
+      authToken: userAppRecord.tursoDbAuthToken
+    });
+    
+    try {
+      setIsLoading(true);
+      
+      const productData = {
+        name: editProduct.name,
+        description: editProduct.description || '',
+        price: editProduct.price ? parseFloat(editProduct.price) || 0 : 0,
+        category: editProduct.category || '',
+        stock: editProduct.stock ? parseInt(editProduct.stock) || 0 : 0,
+      };
+      
+      console.log('[Products] Updating product:', productData);
+      await tursoDb.updateTable('products', productData, `id = ${selectedProduct.id}`);
+      
+      // Reset form and close modal
+      setEditProduct({
+        id: 0,
+        name: '',
+        description: '',
+        price: '',
+        category: '',
+        stock: '',
+      });
+      setSelectedProduct(null);
+      setShowEditModal(false);
+      
+      Alert.alert('Success', 'Product updated successfully!');
+      
+      // Refresh products list
+      await loadProducts();
+      
+    } catch (error) {
+      console.error('[Products] Error updating product:', error);
+      Alert.alert('Error', `Failed to update product: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -263,7 +325,7 @@ export default function SimpleProductsScreen() {
   const renderProductCard = (product: Product, index: number) => {
     // Add defensive checks
     if (!product) {
-      console.warn('[SimpleProducts] renderProductCard received null product at index', index);
+      console.warn('[Products] renderProductCard received null product at index', index);
       return null;
     }
     
@@ -277,7 +339,7 @@ export default function SimpleProductsScreen() {
     return (
       <View
         key={index}
-        style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[styles.productCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
         <View style={styles.productHeader}>
           <Text style={[styles.productName, { color: colors.text }]}>{safeName}</Text>
@@ -300,6 +362,23 @@ export default function SimpleProductsScreen() {
             Stock: {safeStock}
           </Text>
         </View>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => {
+            setSelectedProduct(product);
+            setEditProduct({
+              id: product.id,
+              name: product.name,
+              description: product.description || '',
+              price: product.price.toString(),
+              category: product.category || '',
+              stock: product.stock.toString(),
+            });
+            setShowEditModal(true);
+          }}
+        >
+          <Text style={[styles.editButtonText, { color: colors.primary }]}>Edit</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -399,100 +478,265 @@ export default function SimpleProductsScreen() {
         </View>
       </ScrollView>
 
-      {/* Create Product Modal */}
+      {/* Create Product Modal - Linear Style */}
       <Modal
         visible={showCreateModal}
         animationType="slide"
         presentationStyle="pageSheet"
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-              <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
+          <View style={[styles.modalHeader, { backgroundColor: colors.backgroundElevated, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalCancelButton}>
+              <Text style={[TextStyles.button, { color: colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Create Product</Text>
+            <Text style={[TextStyles.label, { color: colors.text, flex: 1, textAlign: 'center' }]}>
+              New Product
+            </Text>
             <TouchableOpacity 
               onPress={handleCreateProduct} 
               disabled={!newProduct.name.trim() || isLoading}
+              style={[styles.createButton, { 
+                backgroundColor: newProduct.name.trim() ? colors.primary : colors.backgroundTertiary 
+              }]}
             >
-              <Text style={[styles.modalSaveText, { 
-                color: newProduct.name.trim() && !isLoading ? colors.primary : colors.textSecondary 
-              }]}>
-                Create
+              <Text style={[
+                TextStyles.buttonSmall, 
+                { color: newProduct.name.trim() ? colors.textInverse : colors.textTertiary }
+              ]}>
+                {isLoading ? 'Creating...' : 'Create'}
               </Text>
             </TouchableOpacity>
           </View>
           
-          <ScrollView style={styles.modalContent}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Product Name</Text>
-            <TextInput
-              style={[styles.textInput, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.border,
-                color: colors.text 
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView 
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Product Details */}
+              <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                <View style={styles.field}>
+                  <Text style={[TextStyles.label, { color: colors.text }]}>Product Name *</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      color: colors.text,
+                      borderColor: colors.border 
+                    }]}
+                    value={newProduct.name}
+                    onChangeText={(text) => setNewProduct(prev => ({...prev, name: text}))}
+                    placeholder="Enter product name..."
+                    placeholderTextColor={colors.textTertiary}
+                    autoCapitalize="sentences"
+                    maxLength={100}
+                    multiline
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[TextStyles.label, { color: colors.text }]}>Description</Text>
+                  <TextInput
+                    style={[styles.textArea, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      color: colors.text,
+                      borderColor: colors.border 
+                    }]}
+                    value={newProduct.description}
+                    onChangeText={(text) => setNewProduct(prev => ({...prev, description: text}))}
+                    placeholder="Add a description for this product..."
+                    placeholderTextColor={colors.textTertiary}
+                    multiline
+                    numberOfLines={3}
+                    maxLength={500}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.fieldRow}>
+                  <View style={styles.halfField}>
+                    <Text style={[TextStyles.label, { color: colors.text }]}>Price ($)</Text>
+                    <TextInput
+                      style={[styles.input, { 
+                        backgroundColor: colors.backgroundSecondary, 
+                        color: colors.text,
+                        borderColor: colors.border 
+                      }]}
+                      value={newProduct.price}
+                      onChangeText={(text) => setNewProduct(prev => ({...prev, price: text}))}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+
+                  <View style={styles.halfField}>
+                    <Text style={[TextStyles.label, { color: colors.text }]}>Stock</Text>
+                    <TextInput
+                      style={[styles.input, { 
+                        backgroundColor: colors.backgroundSecondary, 
+                        color: colors.text,
+                        borderColor: colors.border 
+                      }]}
+                      value={newProduct.stock}
+                      onChangeText={(text) => setNewProduct(prev => ({...prev, stock: text}))}
+                      placeholder="0"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[TextStyles.label, { color: colors.text }]}>Category</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      color: colors.text,
+                      borderColor: colors.border 
+                    }]}
+                    value={newProduct.category}
+                    onChangeText={(text) => setNewProduct(prev => ({...prev, category: text}))}
+                    placeholder="Enter product category..."
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Edit Product Modal - Linear Style */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.backgroundElevated, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.modalCancelButton}>
+              <Text style={[TextStyles.button, { color: colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[TextStyles.label, { color: colors.text, flex: 1, textAlign: 'center' }]}>
+              Edit Product
+            </Text>
+            <TouchableOpacity 
+              onPress={handleUpdateProduct} 
+              disabled={!editProduct.name.trim() || isLoading}
+              style={[styles.createButton, { 
+                backgroundColor: editProduct.name.trim() ? colors.primary : colors.backgroundTertiary 
               }]}
-              value={newProduct.name}
-              onChangeText={(text) => setNewProduct(prev => ({...prev, name: text}))}
-              placeholder="Enter product name..."
-              placeholderTextColor={colors.textSecondary}
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
-            <TextInput
-              style={[styles.textInput, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.border,
-                color: colors.text 
-              }]}
-              value={newProduct.description}
-              onChangeText={(text) => setNewProduct(prev => ({...prev, description: text}))}
-              placeholder="Enter product description..."
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              numberOfLines={3}
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Price</Text>
-            <TextInput
-              style={[styles.textInput, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.border,
-                color: colors.text 
-              }]}
-              value={newProduct.price}
-              onChangeText={(text) => setNewProduct(prev => ({...prev, price: text}))}
-              placeholder="Enter price..."
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Category</Text>
-            <TextInput
-              style={[styles.textInput, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.border,
-                color: colors.text 
-              }]}
-              value={newProduct.category}
-              onChangeText={(text) => setNewProduct(prev => ({...prev, category: text}))}
-              placeholder="Enter category..."
-              placeholderTextColor={colors.textSecondary}
-            />
-            
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Stock</Text>
-            <TextInput
-              style={[styles.textInput, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.border,
-                color: colors.text 
-              }]}
-              value={newProduct.stock}
-              onChangeText={(text) => setNewProduct(prev => ({...prev, stock: text}))}
-              placeholder="Enter stock quantity..."
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-            />
-          </ScrollView>
+            >
+              <Text style={[
+                TextStyles.buttonSmall, 
+                { color: editProduct.name.trim() ? colors.textInverse : colors.textTertiary }
+              ]}>
+                {isLoading ? 'Updating...' : 'Update'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView 
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Product Details */}
+              <View style={[styles.section, { backgroundColor: colors.surface }]}>
+                <View style={styles.field}>
+                  <Text style={[TextStyles.label, { color: colors.text }]}>Product Name *</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      color: colors.text,
+                      borderColor: colors.border 
+                    }]}
+                    value={editProduct.name}
+                    onChangeText={(text) => setEditProduct(prev => ({...prev, name: text}))}
+                    placeholder="Enter product name..."
+                    placeholderTextColor={colors.textTertiary}
+                    autoCapitalize="sentences"
+                    maxLength={100}
+                    multiline
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[TextStyles.label, { color: colors.text }]}>Description</Text>
+                  <TextInput
+                    style={[styles.textArea, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      color: colors.text,
+                      borderColor: colors.border 
+                    }]}
+                    value={editProduct.description}
+                    onChangeText={(text) => setEditProduct(prev => ({...prev, description: text}))}
+                    placeholder="Add a description for this product..."
+                    placeholderTextColor={colors.textTertiary}
+                    multiline
+                    numberOfLines={3}
+                    maxLength={500}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.fieldRow}>
+                  <View style={styles.halfField}>
+                    <Text style={[TextStyles.label, { color: colors.text }]}>Price ($)</Text>
+                    <TextInput
+                      style={[styles.input, { 
+                        backgroundColor: colors.backgroundSecondary, 
+                        color: colors.text,
+                        borderColor: colors.border 
+                      }]}
+                      value={editProduct.price}
+                      onChangeText={(text) => setEditProduct(prev => ({...prev, price: text}))}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+
+                  <View style={styles.halfField}>
+                    <Text style={[TextStyles.label, { color: colors.text }]}>Stock</Text>
+                    <TextInput
+                      style={[styles.input, { 
+                        backgroundColor: colors.backgroundSecondary, 
+                        color: colors.text,
+                        borderColor: colors.border 
+                      }]}
+                      value={editProduct.stock}
+                      onChangeText={(text) => setEditProduct(prev => ({...prev, stock: text}))}
+                      placeholder="0"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[TextStyles.label, { color: colors.text }]}>Category</Text>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.backgroundSecondary, 
+                      color: colors.text,
+                      borderColor: colors.border 
+                    }]}
+                    value={editProduct.category}
+                    onChangeText={(text) => setEditProduct(prev => ({...prev, category: text}))}
+                    placeholder="Enter product category..."
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </View>
@@ -568,8 +812,9 @@ const styles = StyleSheet.create({
   },
   productCard: {
     padding: Spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: Radius.lg,
+    borderWidth: 0.5,
+    ...Shadow.sm,
   },
   productHeader: {
     flexDirection: 'row',
@@ -603,47 +848,69 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  editButton: {
+    marginTop: Spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   
-  // Modal Styles
+  // Modal Styles - Linear Style
   modalContainer: {
     flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 0.5,
+    ...Shadow.sm,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  modalCancelText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalSaveText: {
-    fontSize: 16,
-    fontWeight: '600',
+  modalCancelButton: {
+    padding: Spacing.xs,
   },
   modalContent: {
+    paddingBottom: Spacing['2xl'],
+  },
+  keyboardAvoidingView: {
     flex: 1,
+  },
+  section: {
+    margin: Spacing.lg,
     padding: Spacing.lg,
+    borderRadius: Radius.lg,
   },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.md,
+  field: {
+    marginBottom: Spacing.lg,
   },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
+  fieldRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  halfField: {
+    flex: 1,
+  },
+  input: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    fontSize: 16,
-    marginBottom: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    ...TextStyles.body,
+    marginTop: Spacing.sm,
+    minHeight: 44,
+  },
+  textArea: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    ...TextStyles.body,
+    marginTop: Spacing.sm,
+    minHeight: 100,
   },
 });
