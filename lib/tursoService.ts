@@ -98,27 +98,72 @@ export const tursoService = {
       
       // Extract database URL from response - try multiple possible structures
       let dbUrl = '';
+      let orgName = '';
       
       // Try different possible response structures
       if (database && database.db && database.db.url) {
         dbUrl = database.db.url; // New structure
+        // Extract org name from URL if possible
+        const urlMatch = dbUrl.match(/libsql:\/\/([^.]+)\.([^.]*)\.turso\.io/);
+        if (urlMatch && urlMatch[2]) {
+          orgName = urlMatch[2];
+        }
       } else if (database && database.database && database.database.dbUrl) {
         dbUrl = database.database.dbUrl; // Old structure
+        // Extract org name from URL if possible
+        const urlMatch = dbUrl.match(/libsql:\/\/([^.]+)\.([^.]*)\.turso\.io/);
+        if (urlMatch && urlMatch[2]) {
+          orgName = urlMatch[2];
+        }
       } else if (database && database.dbUrl) {
         dbUrl = database.dbUrl; // Direct field
+        // Extract org name from URL if possible
+        const urlMatch = dbUrl.match(/libsql:\/\/([^.]+)\.([^.]*)\.turso\.io/);
+        if (urlMatch && urlMatch[2]) {
+          orgName = urlMatch[2];
+        }
       } else if (database && database.hostname) {
         dbUrl = `libsql://${database.hostname}`; // Hostname field
+        // Extract org name from hostname if possible
+        const hostnameMatch = database.hostname.match(/([^.]+)\.([^.]+)\.turso\.io/);
+        if (hostnameMatch && hostnameMatch[2]) {
+          orgName = hostnameMatch[2];
+        }
       } else if (database && database.db && database.db.host) {
         dbUrl = `libsql://${database.db.host}`; // Host field
+        // Extract org name from host if possible
+        const hostMatch = database.db.host.match(/([^.]+)\.([^.]+)\.turso\.io/);
+        if (hostMatch && hostMatch[2]) {
+          orgName = hostMatch[2];
+        }
       } else {
-        // Construct URL from database name if not in response
-        dbUrl = `libsql://${dbName}.turso.io`;
+        // Construct URL from database name and organization
+        // Get organization name from environment variables
+        orgName = process.env.EXPO_PUBLIC_TURSO_ORG || '';
+        if (orgName) {
+          dbUrl = `libsql://${dbName}-${orgName}.turso.io`;
+        } else {
+          // Fallback to just database name (might not work)
+          dbUrl = `libsql://${dbName}.turso.io`;
+        }
       }
+      
+      console.log(`[Turso] Extracted org name: ${orgName}`);
+
+      // Validate that we have a proper database URL
+      if (!dbUrl || !dbUrl.startsWith('libsql://')) {
+        throw new Error('Invalid database URL received from Turso API');
+      }
+
+      // Extract the hostname from the libsql URL for HTTPS access
+      const hostname = dbUrl.replace('libsql://', '');
+      const httpsUrl = `https://${hostname}`;
 
       const result = {
         name: dbName,
         url: dbUrl, // Keep the libsql URL for compatibility
         httpsUrl: httpsUrl, // Add the HTTPS URL for HTTP-based service
+        orgName: orgName, // Add the organization name
         authToken: authToken,
       };
       

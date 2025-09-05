@@ -15,6 +15,7 @@ const _schema = i.schema({
       appid: i.string().optional(),
       tursoDbName: i.string().optional(),
       tursoDbHostname: i.string().optional(),
+      tursoDbOrgName: i.string().optional(),
       tursoDbAuthToken: i.string().optional(),
     }),
   },
